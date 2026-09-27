@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#0A0A0B" />
+  <title>Autocue — Cue. Split. Mix. Anywhere.</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <span class="wordmark">Autocue</span>
+        <span class="tagline">Cue. Split. Mix. Anywhere.</span>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="chip" id="btn-help" title="Keyboard shortcuts">?</button>
+        <label class="ai-mode" title="AI Mode">
+          <input type="checkbox" id="ai-mode" checked />
+          <span class="ai-mode-track"><span class="ai-mode-thumb"></span></span>
+          <span class="ai-mode-label">AI Mode</span>
+        </label>
+      </div>
+    </header>
+
+    <section class="decks" aria-label="Dual decks">
+      <!-- Deck A -->
+      <article class="deck deck-a" data-deck="A">
+        <header class="deck-head">
+          <span class="deck-label">Deck A</span>
+          <span class="badge badge-local" data-ready="true">Mix-ready · Local</span>
+        </header>
+        <div class="track-meta">
+          <h2 class="track-title" data-field="title">Neon Drift</h2>
+          <p class="track-artist" data-field="artist">Lumen Arc</p>
+          <p class="track-stats">
+            <span data-field="bpm">128 BPM</span>
+            <span class="dot">·</span>
+            <span data-field="camelot">8A</span>
+            <span class="dot">·</span>
+            <span data-field="key">Am</span>
+          </p>
+        </div>
+        <div class="waveform-wrap">
+          <canvas class="waveform" width="640" height="120" aria-label="Deck A waveform"></canvas>
+          <div class="playhead"></div>
+        </div>
+        <div class="transport">
+          <button type="button" class="btn btn-cue" data-action="cue" title="Cue">CUE</button>
+          <button type="button" class="btn btn-play" data-action="play" title="Play / Pause" aria-pressed="false">
+            <span class="icon-play"></span>
+          </button>
+          <button type="button" class="btn btn-sync" data-action="sync" title="Sync">SYNC</button>
+        </div>
+      </article>
+
+      <!-- Mixer center -->
+      <aside class="mixer" aria-label="Mixer">
+        <div class="xfader-block">
+          <label class="xfader-label" for="crossfader">Crossfader</label>
+          <input type="range" id="crossfader" class="crossfader" min="0" max="100" value="50" />
+          <div class="xfader-ends">
+            <span class="xf-a">A</span>
+            <span class="xf-b">B</span>
+          </div>
+        </div>
+        <div class="master-meter" aria-hidden="true">
+          <div class="meter-bar" id="meter-a"></div>
+          <div class="meter-bar" id="meter-b"></div>
+        </div>
+      </aside>
+
+      <!-- Deck B -->
+      <article class="deck deck-b" data-deck="B">
+        <header class="deck-head">
+          <span class="deck-label">Deck B</span>
+          <span class="badge badge-spotify" data-ready="false">Cue-only · Spotify</span>
+        </header>
+        <div class="track-meta">
+          <h2 class="track-title" data-field="title">Violet Static</h2>
+          <p class="track-artist" data-field="artist">Pulse Theory</p>
+          <p class="track-stats">
+            <span data-field="bpm">126 BPM</span>
+            <span class="dot">·</span>
+            <span data-field="camelot">9A</span>
+            <span class="dot">·</span>
+            <span data-field="key">Em</span>
+          </p>
+        </div>
+        <div class="waveform-wrap">
+          <canvas class="waveform" width="640" height="120" aria-label="Deck B waveform"></canvas>
+          <div class="playhead"></div>
+        </div>
+        <div class="transport">
+          <button type="button" class="btn btn-cue" data-action="cue" title="Cue">CUE</button>
+          <button type="button" class="btn btn-play" data-action="play" title="Play / Pause" aria-pressed="false">
+            <span class="icon-play"></span>
+          </button>
+          <button type="button" class="btn btn-sync" data-action="sync" title="Sync">SYNC</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="stems-panel" aria-label="AI Stems">
+      <header class="panel-head">
+        <h3>AI Stems</h3>
+        <span class="panel-sub">On-device · Vocals / Drums / Bass / Other</span>
+      </header>
+      <div class="stem-deck-tabs">
+        <button type="button" class="stem-tab active" data-stem-deck="A">Deck A</button>
+        <button type="button" class="stem-tab" data-stem-deck="B">Deck B</button>
+      </div>
+      <div class="stem-faders" id="stem-faders">
+        <label class="stem-fader" data-stem="vocals">
+          <input type="range" orient="vertical" min="0" max="100" value="100" />
+          <span class="stem-name">Vocals</span>
+        </label>
+        <label class="stem-fader" data-stem="drums">
+          <input type="range" orient="vertical" min="0" max="100" value="100" />
+          <span class="stem-name">Drums</span>
+        </label>
+        <label class="stem-fader" data-stem="bass">
+          <input type="range" orient="vertical" min="0" max="100" value="100" />
+          <span class="stem-name">Bass</span>
+        </label>
+        <label class="stem-fader" data-stem="other">
+          <input type="range" orient="vertical" min="0" max="100" value="100" />
+          <span class="stem-name">Other</span>
+        </label>
+      </div>
+      <p class="stem-note" id="stem-note">Deck A is mix-ready — stems active. Deck B is cue-only (streaming DRM).</p>
+    </section>
+
+    <section class="setlist" aria-label="AI Setlist">
+      <header class="panel-head setlist-head">
+        <div>
+          <h3>AI Setlist</h3>
+          <span class="panel-sub">Suggested next · mock catalog</span>
+        </div>
+        <div class="setlist-toggles">
+          <label class="toggle">
+            <input type="checkbox" id="toggle-harmonic" checked />
+            <span>Harmonic</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-energy" checked />
+            <span>Energy</span>
+          </label>
+        </div>
+      </header>
+      <div class="setlist-strip" id="setlist-strip" role="list"></div>
+    </section>
+
+    <footer class="footer">
+      <span>Prototype · mock data · no real Spotify/Apple streaming</span>
+      <span class="footer-brand">Autocue</span>
+    </footer>
+  </div>
+
+  <dialog id="help-dialog" class="help-dialog">
+    <form method="dialog">
+      <h3>Shortcuts</h3>
+      <ul>
+        <li><kbd>Space</kbd> Play / pause focused deck</li>
+        <li><kbd>A</kbd> / <kbd>B</kbd> Focus deck</li>
+        <li><kbd>Q</kbd> Cue focused deck</li>
+        <li><kbd>←</kbd> <kbd>→</kbd> Nudge crossfader</li>
+        <li><kbd>?</kbd> Toggle this help</li>
+      </ul>
+      <button type="submit" class="btn btn-dialog">Close</button>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
