@@ -1,11 +1,15 @@
 {
   "name": "autocue",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Autocue — Cue. Split. Mix. Anywhere. Music aggregator for cueing & mixing across streaming services with on-device AI stem splitting.",
   "private": true,
   "scripts": {
     "proto": "python3 -m http.server 5173 --directory prototype",
-    "proto:serve": "npx --yes serve prototype -p 5173"
+    "proto:serve": "npx --yes serve prototype -p 5173",
+    "web": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "mobile": "npm --prefix mobile start",
+    "mobile:ios": "npm --prefix mobile run ios"
   },
   "keywords": [
     "dj",
@@ -13,7 +17,9 @@
     "stems",
     "spotify",
     "apple-music",
-    "autocue"
+    "autocue",
+    "expo",
+    "testflight"
   ],
   "license": "UNLICENSED",
   "engines": {

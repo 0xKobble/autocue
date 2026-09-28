@@ -220,4 +220,5 @@ Report files changed and how to open the prototype.
 
 - [PRODUCT.md](./PRODUCT.md)  
 - [ARCHITECTURE.md](./ARCHITECTURE.md)  
+- [TESTFLIGHT.md](./TESTFLIGHT.md) — iOS TestFlight / EAS  
 - [../README.md](../README.md)  

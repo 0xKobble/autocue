@@ -1,0 +1,21 @@
+:root {
+  --void: #0A0A0B;
+  --void-elevated: #121214;
+  --void-panel: #16161A;
+  --lime: #B8FF3C;
+  --lime-dim: rgba(184, 255, 60, 0.15);
+  --lime-glow: rgba(184, 255, 60, 0.35);
+  --violet: #7B5CFF;
+  --violet-dim: rgba(123, 92, 255, 0.18);
+  --violet-glow: rgba(123, 92, 255, 0.4);
+  --fog: #9A9AA3;
+  --fog-dim: #6B6B73;
+  --white: #F4F4F5;
+  --danger: #FF5C7A;
+  --spotify: #1DB954;
+  --apple: #FC3C44;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --font: "Inter", "SF Pro Display", system-ui, -apple-system, sans-serif;
+  --mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+}

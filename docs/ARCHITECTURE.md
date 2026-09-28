@@ -85,9 +85,9 @@ flowchart LR
 
 | Stage | Stack | Notes |
 |-------|-------|-------|
-| Prototype | Static HTML/CSS/JS | No build; mock catalog; oscillators |
-| Web app | React + Next (or Vite) | Componentize decks; shared design tokens |
-| Native | React Native / Expo | App Store; Local Mode file picker; Core ML |
+| Prototype | Static HTML/CSS/JS (`prototype/`) | No build; mock catalog; oscillators |
+| Web app | Vite + React + TypeScript (`web/`) | Dual-deck components; shared tokens; mixReady gating |
+| Native | Expo / React Native (`mobile/`) | Expo Router; EAS → TestFlight; Local Mode later |
 | Stem web | ONNX Runtime Web / WASM | Heavier; progress UX; optional WebGPU |
 | Stem iOS | Core ML export of Demucs-class model | Preferred on-device path for App Store |
 

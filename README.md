@@ -21,30 +21,52 @@ Tagline: **Cue. Split. Mix. Anywhere.**
 
 ---
 
-## Quick start — prototype
+## Quick start
 
-No build step. Open the static dual-deck UI:
+### Web app (Vite + React + TypeScript)
 
 ```bash
-# From this repo root (Python static server — no deps)
+cd web
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # production build → web/dist
+```
+
+Dual-deck React port of the prototype: Deck, Waveform, Transport, Crossfader, StemPanel, SetlistStrip, TrackBadge, mock catalog, Web Audio oscillators, **mixReady** gating (cue-only vs mix-ready).
+
+### Mobile (Expo / React Native)
+
+```bash
+cd mobile
+npm install
+npx expo start          # Expo Go / simulator
+npm run ios             # macOS + Simulator
+```
+
+**EAS / TestFlight production iOS build:**
+
+```bash
+cd mobile
+npm install -g eas-cli
+eas login
+eas init                # once — paste projectId into app.json
+eas build -p ios --profile production
+eas submit -p ios --profile production --latest
+```
+
+Full steps, Apple credentials you must supply, and blockers: **[docs/TESTFLIGHT.md](docs/TESTFLIGHT.md)**.
+
+Bundle ID: `com.kobble.autocue`
+
+### HTML prototype (no build)
+
+```bash
+# From repo root
 npm run proto
-# → http://localhost:5173
+# → http://localhost:5173  (serves prototype/)
 ```
 
-Or open the file directly (fully offline):
-
-```bash
-open prototype/index.html   # macOS
-xdg-open prototype/index.html   # Linux
-```
-
-Optional Node static server:
-
-```bash
-npm run proto:serve
-```
-
-The prototype uses mock catalog data and Web Audio oscillators for play/cue click feedback. It does **not** stream real Spotify/Apple audio.
+Or open `prototype/index.html` directly. Mock catalog + Web Audio only — not real streaming.
 
 ---
 
@@ -52,45 +74,47 @@ The prototype uses mock catalog data and Web Audio oscillators for play/cue clic
 
 ```
 autocue/
-├── README.md                 ← you are here
-├── package.json              ← `npm run proto`
+├── README.md
+├── package.json              ← proto scripts + workspace helpers
 ├── docs/
-│   ├── PRODUCT.md            ← experience flows, screens, metrics
-│   ├── ARCHITECTURE.md       ← system design, data models, Mermaid
-│   └── HANDOFF.md            ← paste-ready prompts for coding agents
-└── prototype/
-    ├── index.html            ← dual-deck shell
-    ├── styles.css            ← brand tokens + layout
-    └── app.js                ← decks, stems, setlist, Web Audio
+│   ├── PRODUCT.md
+│   ├── ARCHITECTURE.md
+│   ├── HANDOFF.md
+│   └── TESTFLIGHT.md         ← Apple / EAS / TestFlight steps
+├── prototype/                ← static dual-deck (kept working)
+├── web/                      ← Vite + React + TypeScript
+└── mobile/                   ← Expo Router + EAS (TestFlight path)
+    ├── app/                  ← Expo Router screens
+    ├── app.json              ← bundle id com.kobble.autocue
+    └── eas.json              ← production profile for eas build -p ios
 ```
 
 ---
 
-## What the prototype shows
+## What ships today
 
-- Wordmark + dual decks (Deck A lime / Deck B violet)
-- Animated fake waveforms (canvas)
-- Play / pause / cue, crossfader
-- AI Stems panel — Vocals / Drums / Bass / Other faders that mute waveform layers
-- AI Setlist strip with sample tracks + Spotify / Apple badges
-- Harmonic match + energy toggles, AI Mode toggle
-- Responsive; works offline via `file://` or a static server
+| Surface | Status |
+|---------|--------|
+| Dual decks (A lime / B violet) | Web + mobile + prototype |
+| Waveforms + stem mute layers | Web (canvas); mobile (bar viz) |
+| Play / cue / sync + crossfader | Web + mobile + prototype |
+| AI Stems panel (mixReady gated) | Web + mobile + prototype |
+| AI Setlist strip + badges | Web + mobile + prototype |
+| Mock catalog only | All — no real Spotify/Apple audio |
+| TestFlight submit | Documented; needs your Apple + EAS credentials |
 
 ---
 
-## Next build phases
+## TestFlight status
 
-| Phase | Goal | Details |
-|-------|------|---------|
-| **A** | Polish HTML prototype | UX polish, keyboard shortcuts, better waveforms |
-| **B** | React / Next web app | Componentize decks, state, routing |
-| **C** | Stem pipeline | Demucs / ONNX Runtime Web / Core ML on-device |
-| **D** | Spotify (then Apple) auth | OAuth browse/cue/metadata only — no DRM mix claims |
-| **E** | Expo / React Native | App Store path; Local Mode + Core ML stems |
+**Blocked on credentials you must provide:**
 
-Full agent prompts and definitions of done: **[docs/HANDOFF.md](docs/HANDOFF.md)**.  
-Architecture & constraints: **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.  
-Product flows: **[docs/PRODUCT.md](docs/PRODUCT.md)**.
+1. Apple Developer Team ID / membership  
+2. App Store Connect app + numeric App ID  
+3. ASC API key (`.p8`) **or** Apple ID for `eas submit`  
+4. EAS project ID from `eas init`  
+
+Until those exist, `eas build -p ios` / `eas submit` cannot finish. See [docs/TESTFLIGHT.md](docs/TESTFLIGHT.md).
 
 ---
 
@@ -100,6 +124,17 @@ Product flows: **[docs/PRODUCT.md](docs/PRODUCT.md)**.
 - Streaming APIs = catalog, metadata, preview/cue where licensed.
 - Real mix + stem split = **Local Mode** (user-owned files) + demo stems for the UI.
 - Ship clear UI copy when a track is “cue-only” vs “mix-ready.”
+
+---
+
+## Docs
+
+- [PRODUCT.md](docs/PRODUCT.md) — flows & metrics  
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) — systems & DRM model  
+- [HANDOFF.md](docs/HANDOFF.md) — agent phase prompts  
+- [TESTFLIGHT.md](docs/TESTFLIGHT.md) — iOS TestFlight / EAS  
+
+GitHub: [0xKobble/autocue](https://github.com/0xKobble/autocue)
 
 ---
 
