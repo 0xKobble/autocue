@@ -2,9 +2,9 @@
 
 **Cue. Split. Mix. Anywhere.**
 
-Autocue is a music aggregator for cueing and mixing across streaming services (Spotify, Apple Music, local files) with **on-device AI stem splitting** and **AI-assisted setlists**. Dual-deck UI, stem faders, harmonic matching — built for DJs and producers who want to prepare and mix without leaving their catalog.
+Autocue is a music aggregator for cueing and mixing across Spotify, Apple Music, **YouTube Music**, SoundCloud, and local files with **on-device stem splitting** and **AI-assisted setlists**. Dual-deck UI, CDJ-style stem faders, harmonic matching — built for DJs who prep from streaming and mix from Local / Demo.
 
-> **Important:** Protected streaming tracks (Spotify/Apple DRM) cannot be true-mixed or stem-split. Autocue uses streaming for browse/cue/metadata, and **Local / Downloaded mode** (plus demo stems) for real mixing and AI stems. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+> **Important:** Spotify / Apple Music / **YouTube Music** DRM streams are **cue/browse only** — never true-mixed or stem-split. SoundCloud streams are cue-only unless a downloadable/local mirror. **Local uploads** and **Demo stem packs** are `mixReady`. YouTube Music uses a **Google Play Music–inspired** Library / Playlists / Recents UI (GPM itself is shut down — no live GPM API). See [docs/PRODUCT.md](docs/PRODUCT.md).
 
 ---
 
@@ -96,11 +96,15 @@ autocue/
 | Surface | Status |
 |---------|--------|
 | Dual decks (A lime / B violet) | Web + mobile + prototype |
-| Waveforms + stem mute layers | Web (canvas); mobile (bar viz) |
-| Play / cue / sync + crossfader | Web + mobile + prototype |
+| Sources / Library panel | Web — Local, SC mock, YTM (GPM-style), Spotify/Apple cue |
+| YTM Library / Playlists / Recents | Web — mock OAuth + mock catalog (cue-only) |
+| Local file upload + band-split stems | Web — Web Audio client-side |
+| Demo stem packs (4 buffers) | Web — CDJ mute/solo/faders |
+| Play / cue / sync / pitch + crossfader | Web + mobile + prototype |
 | AI Stems panel (mixReady gated) | Web + mobile + prototype |
 | AI Setlist strip + badges | Web + mobile + prototype |
-| Mock catalog only | All — no real Spotify/Apple audio |
+| Real Spotify/Apple/YTM/SC audio | Not shipped — mock / cue-only honesty |
+| True Demucs ML stems | Not yet — band-split / demo until WASM/native |
 | TestFlight submit | Documented; needs your Apple + EAS credentials |
 
 ---
@@ -121,8 +125,9 @@ Until those exist, `eas build -p ios` / `eas submit` cannot finish. See [docs/TE
 ## Legal / product guardrails
 
 - Do **not** invent or claim legal true-mixing of DRM-protected streams.
-- Streaming APIs = catalog, metadata, preview/cue where licensed.
-- Real mix + stem split = **Local Mode** (user-owned files) + demo stems for the UI.
+- Streaming APIs (Spotify / Apple / YouTube Music / SoundCloud) = catalog, metadata, preview/cue where licensed.
+- Real mix + stem split = **Local Mode** (user-owned files) + **Demo** stem packs.
+- YouTube Music UI mirrors classic **Google Play Music** library browse; GPM API is not used.
 - Ship clear UI copy when a track is “cue-only” vs “mix-ready.”
 
 ---

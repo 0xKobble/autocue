@@ -10,7 +10,7 @@ This document is the build blueprint for a real Autocue app: client layers, plat
 
 ### Goals
 
-- Dual-deck cueing & mixing UI across **Spotify**, **Apple Music**, and **Local**.
+- Dual-deck cueing & mixing UI across **Spotify**, **Apple Music**, **YouTube Music**, **SoundCloud**, and **Local**.
 - **On-device** AI stem splitting for mix-ready audio.
 - AI setlist suggestions (harmonic / energy / creative modes).
 - Honest product: streaming for browse/cue/metadata; Local for true mix + stems.
@@ -39,6 +39,8 @@ flowchart TB
   subgraph Sources["Sources"]
     SP["Spotify Web API\n(OAuth)"]
     AM["Apple MusicKit\n(OAuth / Dev Token)"]
+    YTM["YouTube Music\n(cue / GPM-style UI)"]
+    SC["SoundCloud\n(OAuth)"]
     LOC["Local / Downloaded\nFiles"]
     DEMO["Demo Stem Packs"]
   end
@@ -96,6 +98,10 @@ flowchart LR
 ## 4. Streaming reality (critical)
 
 ### What APIs allow
+
+- **YouTube Music**: treat like other DRM streaming — **cue/browse only** in Autocue. UI browse (Library / Playlists / Recents) is **Google Play Music–inspired**; there is **no live GPM API** (service shutdown).
+- **SoundCloud**: OAuth + catalog; mix only when user has a downloadable/local file. Real API needs a client id (never commit secrets).
+
 
 - **Spotify Web API**: OAuth, search, playlists, metadata, **previews** (often ~30s). Playback of full tracks in third-party apps is constrained; Web Playback SDK requires Premium and does not grant stem access or remix rights.
 - **Apple MusicKit**: Auth + catalog + player for subscribers. Streams remain DRM-protected; apps do not get raw PCM for arbitrary processing.

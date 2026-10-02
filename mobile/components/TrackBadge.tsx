@@ -17,6 +17,12 @@ export function TrackBadge({
   } else if (source === "apple") {
     label = "Cue-only · Apple";
     style = styles.apple;
+  } else if (source === "youtube") {
+    cls = "badge badge-youtube";
+    label = "Cue-only · YouTube Music";
+  } else if (source === "soundcloud") {
+    cls = "badge badge-soundcloud";
+    label = mixReady ? "Mix-ready · SC" : "Cue-only · SoundCloud";
   } else if (source === "demo") {
     label = mixReady ? "Mix-ready · Demo" : "Cue-only · Demo";
     style = styles.local;
@@ -37,9 +43,13 @@ export function SourceBadge({ source }: { source: SourceKind }) {
       ? "Spotify"
       : source === "apple"
         ? "Apple"
-        : source === "demo"
-          ? "Demo"
-          : "Local";
+        : source === "youtube"
+          ? "YT Music"
+          : source === "soundcloud"
+            ? "SoundCloud"
+            : source === "demo"
+              ? "Demo"
+              : "Local";
   const style =
     source === "spotify"
       ? styles.spotify

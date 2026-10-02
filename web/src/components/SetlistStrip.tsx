@@ -26,7 +26,7 @@ export function SetlistStrip({
       <header className="panel-head setlist-head">
         <div>
           <h3>AI Setlist</h3>
-          <span className="panel-sub">Suggested next · mock catalog</span>
+          <span className="panel-sub">Suggested next · unified catalog</span>
         </div>
         <div className="setlist-toggles">
           <label className="toggle">

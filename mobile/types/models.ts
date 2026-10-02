@@ -1,6 +1,13 @@
 /** Autocue shared domain models — mixReady gates real mix/stems. */
 
-export type SourceKind = "spotify" | "apple" | "local" | "demo";
+export type SourceKind =
+  | "spotify"
+  | "apple"
+  | "local"
+  | "demo"
+  | "soundcloud"
+  | "youtube";
+
 export type DeckId = "A" | "B";
 export type StemName = "vocals" | "drums" | "bass" | "other";
 
@@ -20,6 +27,7 @@ export interface Track {
   previewUrl?: string;
   localUri?: string;
   reason?: string;
+  downloadable?: boolean;
 }
 
 export type StemGains = Record<StemName, number>;

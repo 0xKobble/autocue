@@ -79,6 +79,33 @@ export const MOCK_CATALOG: Track[] = [
     reason: "AI creative pick",
     energy: 0.55,
   },
+
+  {
+    id: "t7",
+    title: "Chrome Skyline",
+    artist: "Metro Fiction",
+    durationMs: 255000,
+    bpm: 122,
+    camelot: "7B",
+    key: "F",
+    source: "youtube",
+    mixReady: false,
+    reason: "YouTube Music · cue only",
+    energy: 0.68,
+  },
+  {
+    id: "t8",
+    title: "Midnight Freight",
+    artist: "Low Voltage",
+    durationMs: 305000,
+    bpm: 126,
+    camelot: "8A",
+    key: "Am",
+    source: "soundcloud",
+    mixReady: false,
+    reason: "SC · cue / browse",
+    energy: 0.8,
+  },
 ];
 
 export const INITIAL_DECK_A: Track = {

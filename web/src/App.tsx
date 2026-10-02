@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Crossfader } from "./components/Crossfader";
 import { Deck } from "./components/Deck";
 import { SetlistStrip } from "./components/SetlistStrip";
+import { SourcesPanel } from "./components/SourcesPanel";
 import { StemPanel } from "./components/StemPanel";
 import { useDeckEngine } from "./hooks/useDeckEngine";
 import type { DeckId } from "./types/models";
@@ -10,10 +11,17 @@ export default function App() {
   const engine = useDeckEngine();
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const onLoad = useCallback(
+  const onLoadId = useCallback(
     (trackId: string) => {
       const track = engine.catalog.find((t) => t.id === trackId);
       if (track) engine.loadToDeck(engine.focused, track);
+    },
+    [engine]
+  );
+
+  const onLoadTrack = useCallback(
+    (track: Parameters<typeof engine.loadToDeck>[1]) => {
+      engine.loadToDeck(engine.focused, track);
     },
     [engine]
   );
@@ -96,6 +104,7 @@ export default function App() {
           onPlay={() => engine.togglePlay("A")}
           onCue={() => engine.cueDeck("A")}
           onSync={() => engine.toggleSync("A")}
+          onPitch={(v) => engine.setPitchPercent("A", v)}
         />
         <Crossfader
           value={engine.crossfade}
@@ -111,6 +120,7 @@ export default function App() {
           onPlay={() => engine.togglePlay("B")}
           onCue={() => engine.cueDeck("B")}
           onSync={() => engine.toggleSync("B")}
+          onPitch={(v) => engine.setPitchPercent("B", v)}
         />
       </section>
 
@@ -119,6 +129,21 @@ export default function App() {
         onStemTarget={(id: DeckId) => engine.setStemTarget(id)}
         deck={stemDeck}
         onStem={engine.setStem}
+        onMute={engine.toggleMute}
+        onSolo={engine.toggleSolo}
+      />
+
+      <SourcesPanel
+        sources={engine.sources}
+        onToggle={engine.toggleSource}
+        onLocalFiles={engine.importLocalFiles}
+        onConnectSoundCloud={engine.connectSoundCloud}
+        onConnectYouTube={engine.connectYouTube}
+        scConnecting={engine.scConnecting}
+        ytmConnecting={engine.ytmConnecting}
+        catalog={engine.catalog}
+        onLoadTrack={onLoadTrack}
+        analyzing={engine.globalAnalyzing}
       />
 
       <SetlistStrip
@@ -129,11 +154,13 @@ export default function App() {
         onAiMode={engine.setAiMode}
         onHarmonic={engine.setHarmonicOn}
         onEnergy={engine.setEnergyOn}
-        onLoad={onLoad}
+        onLoad={onLoadId}
       />
 
       <footer className="footer">
-        <span>Web app · mock data · no real Spotify/Apple streaming</span>
+        <span>
+          Local / Demo = mix + preview stems · Spotify / Apple / YTM / SC stream = cue-only
+        </span>
         <span className="footer-brand">Autocue</span>
       </footer>
 
@@ -164,6 +191,10 @@ export default function App() {
                 <kbd>?</kbd> Toggle this help
               </li>
             </ul>
+            <p className="help-note">
+              Upload Local files or load Demo packs for CDJ-style stem faders. YouTube Music
+              uses a GPM-style library browser and stays cue-only.
+            </p>
             <button type="submit" className="btn btn-dialog">
               Close
             </button>

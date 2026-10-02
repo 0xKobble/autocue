@@ -15,6 +15,12 @@ export function TrackBadge({ source, mixReady }: Props) {
   } else if (source === "apple") {
     cls = "badge badge-apple";
     label = "Cue-only · Apple";
+  } else if (source === "youtube") {
+    cls = "badge badge-youtube";
+    label = "Cue-only · YouTube Music";
+  } else if (source === "soundcloud") {
+    cls = mixReady ? "badge badge-local" : "badge badge-soundcloud";
+    label = mixReady ? "Mix-ready · SC download" : "Cue-only · SoundCloud";
   } else if (source === "demo") {
     cls = "badge badge-local";
     label = mixReady ? "Mix-ready · Demo" : "Cue-only · Demo";
@@ -36,8 +42,12 @@ export function SourceBadge({ source }: { source: SourceKind }) {
       ? "Spotify"
       : source === "apple"
         ? "Apple"
-        : source === "demo"
-          ? "Demo"
-          : "Local";
+        : source === "youtube"
+          ? "YT Music"
+          : source === "soundcloud"
+            ? "SoundCloud"
+            : source === "demo"
+              ? "Demo"
+              : "Local";
   return <span className={`source-badge ${source}`}>{label}</span>;
 }

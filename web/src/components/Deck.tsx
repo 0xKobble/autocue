@@ -11,6 +11,7 @@ interface Props {
   onPlay: () => void;
   onCue: () => void;
   onSync: () => void;
+  onPitch: (v: number) => void;
 }
 
 export function Deck({
@@ -21,16 +22,19 @@ export function Deck({
   onPlay,
   onCue,
   onSync,
+  onPitch,
 }: Props) {
   const id = state.deckId as DeckId;
   const track = state.track;
+  const analyzing =
+    state.analyzeStatus === "decoding" || state.analyzeStatus === "splitting";
 
   return (
     <article
       className={`deck deck-${id.toLowerCase()}${focused ? " focused" : ""}`}
       data-deck={id}
       onClick={(e) => {
-        if (!(e.target as HTMLElement).closest("button")) onFocus();
+        if (!(e.target as HTMLElement).closest("button, input, label")) onFocus();
       }}
     >
       <header className="deck-head">
@@ -53,6 +57,9 @@ export function Deck({
           Streaming: cue &amp; browse only. Load Local / Demo for full mix &amp; stems.
         </p>
       )}
+      {analyzing && (
+        <p className="analyze-banner">{state.analyzeMessage ?? "Analyzing…"}</p>
+      )}
       <Waveform
         deckId={id}
         peaks={peaks}
@@ -61,12 +68,13 @@ export function Deck({
         playing={state.playing}
       />
       <Transport
-        deckId={id}
         playing={state.playing}
         synced={state.synced}
+        pitchPercent={state.pitchPercent}
         onPlay={onPlay}
         onCue={onCue}
         onSync={onSync}
+        onPitch={onPitch}
       />
     </article>
   );

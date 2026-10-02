@@ -1,6 +1,6 @@
 import type { Track } from "../types/models";
 
-/** Mock catalog only — no real Spotify/Apple streams. */
+/** Mock catalog — no real Spotify / Apple / YouTube Music / SoundCloud streams. */
 export const MOCK_CATALOG: Track[] = [
   {
     id: "t1",
@@ -80,6 +80,72 @@ export const MOCK_CATALOG: Track[] = [
     reason: "AI creative pick",
     energy: 0.55,
   },
+  {
+    id: "t7",
+    title: "Midnight Freight",
+    artist: "Low Voltage",
+    durationMs: 305000,
+    bpm: 126,
+    camelot: "8A",
+    key: "Am",
+    source: "soundcloud",
+    mixReady: false,
+    reason: "SC · cue / browse",
+    energy: 0.8,
+  },
+  {
+    id: "t8",
+    title: "SC Download — Tunnel Echo",
+    artist: "Rail Line",
+    durationMs: 288000,
+    bpm: 128,
+    camelot: "9A",
+    key: "Em",
+    source: "soundcloud",
+    mixReady: true,
+    downloadable: true,
+    reason: "SC download · mix-ready mirror",
+    energy: 0.84,
+  },
+  {
+    id: "t9",
+    title: "Chrome Skyline",
+    artist: "Metro Fiction",
+    durationMs: 255000,
+    bpm: 122,
+    camelot: "7B",
+    key: "F",
+    source: "youtube",
+    mixReady: false,
+    reason: "YouTube Music · cue only",
+    energy: 0.68,
+  },
+  {
+    id: "t10",
+    title: "Pulse Arcade",
+    artist: "Neon Index",
+    durationMs: 270000,
+    bpm: 132,
+    camelot: "10A",
+    key: "Bm",
+    source: "youtube",
+    mixReady: false,
+    reason: "YouTube Music · cue only",
+    energy: 0.9,
+  },
+  {
+    id: "t11",
+    title: "Demo Stem Pack — Acid Dawn",
+    artist: "Autocue Demo",
+    durationMs: 280000,
+    bpm: 130,
+    camelot: "8A",
+    key: "Am",
+    source: "demo",
+    mixReady: true,
+    reason: "Mix-ready · demo stems",
+    energy: 0.86,
+  },
 ];
 
 export const INITIAL_DECK_A: Track = {
@@ -90,9 +156,10 @@ export const INITIAL_DECK_A: Track = {
   bpm: 128,
   camelot: "8A",
   key: "Am",
-  source: "local",
+  source: "demo",
   mixReady: true,
   energy: 0.8,
+  reason: "Demo stem pack",
 };
 
 export const INITIAL_DECK_B: Track = {
@@ -107,3 +174,9 @@ export const INITIAL_DECK_B: Track = {
   mixReady: false,
   energy: 0.76,
 };
+
+/** SoundCloud mock catalog (shown when SC connected). */
+export const SOUNDCLOUD_MOCK: Track[] = MOCK_CATALOG.filter((t) => t.source === "soundcloud");
+
+/** YouTube Music mock catalog (cue-only). */
+export const YOUTUBE_MOCK: Track[] = MOCK_CATALOG.filter((t) => t.source === "youtube");
