@@ -1,6 +1,6 @@
 /**
  * YouTube Music mock library — GPM-inspired browse UX.
- * All tracks are cue-only (mixReady: false). No live YTM / GPM API.
+ * All tracks are cue-only (mixReady: false). Real OAuth uses googleYoutube.ts.
  */
 import type { Track } from "../types/models";
 import { YOUTUBE_MOCK } from "./mockCatalog";
@@ -21,6 +21,8 @@ export interface YtmLibrarySnapshot {
   playlistTracks: Record<string, Track[]>;
 }
 
+export type YtmLibraryMode = "demo" | "google";
+
 const EXTRA: Track[] = [
   {
     id: "yt-lib-1",
@@ -33,7 +35,7 @@ const EXTRA: Track[] = [
     key: "Am",
     source: "youtube",
     mixReady: false,
-    reason: "YouTube Music · library",
+    reason: "YouTube · cue-only",
     energy: 0.72,
   },
   {
@@ -47,7 +49,7 @@ const EXTRA: Track[] = [
     key: "Cm",
     source: "youtube",
     mixReady: false,
-    reason: "YouTube Music · library",
+    reason: "YouTube · cue-only",
     energy: 0.58,
   },
   {
@@ -61,7 +63,7 @@ const EXTRA: Track[] = [
     key: "Em",
     source: "youtube",
     mixReady: false,
-    reason: "YouTube Music · liked",
+    reason: "YouTube · cue-only",
     energy: 0.81,
   },
   {
@@ -75,7 +77,7 @@ const EXTRA: Track[] = [
     key: "Em",
     source: "youtube",
     mixReady: false,
-    reason: "YouTube Music · uploads",
+    reason: "YouTube · cue-only",
     energy: 0.77,
   },
   {
@@ -89,7 +91,7 @@ const EXTRA: Track[] = [
     key: "Bm",
     source: "youtube",
     mixReady: false,
-    reason: "YouTube Music · library",
+    reason: "YouTube · cue-only",
     energy: 0.88,
   },
   {
@@ -103,7 +105,7 @@ const EXTRA: Track[] = [
     key: "Dm",
     source: "youtube",
     mixReady: false,
-    reason: "YouTube Music · radio",
+    reason: "YouTube · cue-only",
     energy: 0.64,
   },
 ];
@@ -149,6 +151,7 @@ function byId(id: string): Track | undefined {
   return ALL.find((t) => t.id === id);
 }
 
+/** Rich demo library used when VITE_GOOGLE_CLIENT_ID is unset. */
 export function getYtmLibrarySnapshot(): YtmLibrarySnapshot {
   const playlistTracks: Record<string, Track[]> = {};
   for (const pl of PLAYLISTS) {

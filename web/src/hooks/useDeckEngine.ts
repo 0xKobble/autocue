@@ -19,7 +19,22 @@ import {
 } from "../audio/stemEngine";
 import { generatePeaks, hashStr } from "../audio/waveform";
 import { INITIAL_DECK_A, INITIAL_DECK_B, MOCK_CATALOG } from "../data/mockCatalog";
-import { YTM_ALL_TRACKS } from "../data/ytmLibrary";
+import {
+  getYtmLibrarySnapshot,
+  type YtmLibraryMode,
+  type YtmLibrarySnapshot,
+} from "../data/ytmLibrary";
+import {
+  getScLibrarySnapshot,
+  SC_ALL_TRACKS,
+  type ScLibrarySnapshot,
+} from "../data/soundcloudLibrary";
+import {
+  fetchYoutubeLibrary,
+  hasGoogleClientId,
+  requestGoogleAccessToken,
+  revokeGoogleToken,
+} from "../auth/googleYoutube";
 import type {
   DeckId,
   DeckState,
@@ -86,6 +101,11 @@ export function useDeckEngine() {
   });
   const [scConnecting, setScConnecting] = useState(false);
   const [ytmConnecting, setYtmConnecting] = useState(false);
+  const [ytmError, setYtmError] = useState<string | null>(null);
+  const [ytmMode, setYtmMode] = useState<YtmLibraryMode>("demo");
+  const [ytmLibrary, setYtmLibrary] = useState<YtmLibrarySnapshot | null>(null);
+  const [scLibrary, setScLibrary] = useState<ScLibrarySnapshot | null>(null);
+  const [googleToken, setGoogleToken] = useState<string | null>(null);
   const [globalAnalyzing, setGlobalAnalyzing] = useState(false);
 
   const crossfadeRef = useRef(crossfade);
@@ -350,18 +370,55 @@ export function useDeckEngine() {
   const connectSoundCloud = useCallback(() => {
     setScConnecting(true);
     window.setTimeout(() => {
+      setScLibrary(getScLibrarySnapshot());
       setSources((prev) => ({ ...prev, soundcloud: true }));
       setScConnecting(false);
-    }, 900);
+    }, 700);
   }, []);
 
-  const connectYouTube = useCallback(() => {
-    setYtmConnecting(true);
-    window.setTimeout(() => {
-      setSources((prev) => ({ ...prev, youtube: true }));
-      setYtmConnecting(false);
-    }, 900);
+  const disconnectSoundCloud = useCallback(() => {
+    setSources((prev) => ({ ...prev, soundcloud: false }));
+    setScLibrary(null);
   }, []);
+
+  const connectYouTube = useCallback(async () => {
+    setYtmConnecting(true);
+    setYtmError(null);
+    try {
+      if (hasGoogleClientId()) {
+        const token = await requestGoogleAccessToken();
+        setGoogleToken(token);
+        const lib = await fetchYoutubeLibrary(token);
+        setYtmLibrary(lib);
+        setYtmMode("google");
+        setSources((prev) => ({ ...prev, youtube: true }));
+      } else {
+        await new Promise((r) => window.setTimeout(r, 650));
+        setYtmLibrary(getYtmLibrarySnapshot());
+        setYtmMode("demo");
+        setGoogleToken(null);
+        setSources((prev) => ({ ...prev, youtube: true }));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "YouTube connect failed";
+      setYtmError(msg);
+      // Fall back to demo library so Connect still feels usable
+      setYtmLibrary(getYtmLibrarySnapshot());
+      setYtmMode("demo");
+      setSources((prev) => ({ ...prev, youtube: true }));
+    } finally {
+      setYtmConnecting(false);
+    }
+  }, []);
+
+  const disconnectYouTube = useCallback(() => {
+    if (googleToken) revokeGoogleToken(googleToken);
+    setGoogleToken(null);
+    setYtmLibrary(null);
+    setYtmMode("demo");
+    setYtmError(null);
+    setSources((prev) => ({ ...prev, youtube: false }));
+  }, [googleToken]);
 
   const importLocalFiles = useCallback(
     async (files: FileList) => {
@@ -451,15 +508,34 @@ export function useDeckEngine() {
 
   const catalog = useMemo(() => {
     const base = [...localTracks, ...MOCK_CATALOG];
-    // when YTM connected, ensure library tracks are in unified catalog
-    if (sources.youtube) {
-      const ids = new Set(base.map((t) => t.id));
-      for (const t of YTM_ALL_TRACKS) {
-        if (!ids.has(t.id)) base.push(t);
+    const ids = new Set(base.map((t) => t.id));
+    if (sources.youtube && ytmLibrary) {
+      for (const t of ytmLibrary.library) {
+        if (!ids.has(t.id)) {
+          base.push(t);
+          ids.add(t.id);
+        }
+      }
+      for (const tracks of Object.values(ytmLibrary.playlistTracks)) {
+        for (const t of tracks) {
+          if (!ids.has(t.id)) {
+            base.push(t);
+            ids.add(t.id);
+          }
+        }
+      }
+    }
+    if (sources.soundcloud) {
+      const scTracks = scLibrary?.stream ?? SC_ALL_TRACKS;
+      for (const t of scTracks) {
+        if (!ids.has(t.id)) {
+          base.push(t);
+          ids.add(t.id);
+        }
       }
     }
     return base;
-  }, [localTracks, sources.youtube]);
+  }, [localTracks, sources.youtube, sources.soundcloud, ytmLibrary, scLibrary]);
 
   const setlist = useMemo(() => {
     let items = catalog
@@ -533,9 +609,15 @@ export function useDeckEngine() {
     sources,
     toggleSource,
     connectSoundCloud,
+    disconnectSoundCloud,
     connectYouTube,
+    disconnectYouTube,
     scConnecting,
     ytmConnecting,
+    ytmError,
+    ytmMode,
+    ytmLibrary,
+    scLibrary,
     importLocalFiles,
     globalAnalyzing,
   };

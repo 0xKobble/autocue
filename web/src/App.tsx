@@ -5,7 +5,7 @@ import { SetlistStrip } from "./components/SetlistStrip";
 import { SourcesPanel } from "./components/SourcesPanel";
 import { StemPanel } from "./components/StemPanel";
 import { useDeckEngine } from "./hooks/useDeckEngine";
-import type { DeckId } from "./types/models";
+import type { DeckId, Track } from "./types/models";
 
 export default function App() {
   const engine = useDeckEngine();
@@ -20,8 +20,8 @@ export default function App() {
   );
 
   const onLoadTrack = useCallback(
-    (track: Parameters<typeof engine.loadToDeck>[1]) => {
-      engine.loadToDeck(engine.focused, track);
+    (track: Track, deck?: DeckId) => {
+      engine.loadToDeck(deck ?? engine.focused, track);
     },
     [engine]
   );
@@ -73,6 +73,9 @@ export default function App() {
           <span className="tagline">Cue. Split. Mix. Anywhere.</span>
         </div>
         <div className="topbar-actions">
+          <a className="chip chip-link" href="#sources" title="Jump to Sources">
+            Sources
+          </a>
           <button
             type="button"
             className="chip"
@@ -138,10 +141,17 @@ export default function App() {
         onToggle={engine.toggleSource}
         onLocalFiles={engine.importLocalFiles}
         onConnectSoundCloud={engine.connectSoundCloud}
-        onConnectYouTube={engine.connectYouTube}
+        onDisconnectSoundCloud={engine.disconnectSoundCloud}
+        onConnectYouTube={() => void engine.connectYouTube()}
+        onDisconnectYouTube={engine.disconnectYouTube}
         scConnecting={engine.scConnecting}
         ytmConnecting={engine.ytmConnecting}
+        ytmError={engine.ytmError}
+        ytmMode={engine.ytmMode}
+        ytmLibrary={engine.ytmLibrary}
+        scLibrary={engine.scLibrary}
         catalog={engine.catalog}
+        focusedDeck={engine.focused}
         onLoadTrack={onLoadTrack}
         analyzing={engine.globalAnalyzing}
       />
@@ -192,8 +202,9 @@ export default function App() {
               </li>
             </ul>
             <p className="help-note">
-              Upload Local files or load Demo packs for CDJ-style stem faders. YouTube Music
-              uses a GPM-style library browser and stays cue-only.
+              Click <strong>Sources</strong> → <strong>Connect YouTube Music</strong> for a
+              GPM-style library (demo or Google when configured). Upload Local files or load
+              Demo packs for CDJ-style stem faders. Streaming stays cue-only.
             </p>
             <button type="submit" className="btn btn-dialog">
               Close

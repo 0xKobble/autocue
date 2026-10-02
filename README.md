@@ -34,6 +34,13 @@ npm run build    # production build → web/dist
 
 Dual-deck React port of the prototype: Deck, Waveform, Transport, Crossfader, StemPanel, SetlistStrip, TrackBadge, mock catalog, Web Audio oscillators, **mixReady** gating (cue-only vs mix-ready).
 
+#### YouTube Music Connect
+
+- **No client ID:** Sources → **Connect YouTube Music** → demo GPM-style Library / Playlists / Recents (cue-only).
+- **With Google:** set `VITE_GOOGLE_CLIENT_ID` in `web/.env.local` (see `web/.env.example`) → **Connect with Google** loads your YouTube playlists via YouTube Data API v3 (still cue-only).
+- Full steps: **[docs/YOUTUBE_MUSIC.md](docs/YOUTUBE_MUSIC.md)**.
+
+
 ### Mobile (Expo / React Native)
 
 ```bash
@@ -80,7 +87,8 @@ autocue/
 │   ├── PRODUCT.md
 │   ├── ARCHITECTURE.md
 │   ├── HANDOFF.md
-│   └── TESTFLIGHT.md         ← Apple / EAS / TestFlight steps
+│   ├── TESTFLIGHT.md         ← Apple / EAS / TestFlight steps
+│   └── YOUTUBE_MUSIC.md      ← Google OAuth + YTM browse
 ├── prototype/                ← static dual-deck (kept working)
 ├── web/                      ← Vite + React + TypeScript
 └── mobile/                   ← Expo Router + EAS (TestFlight path)
@@ -97,7 +105,7 @@ autocue/
 |---------|--------|
 | Dual decks (A lime / B violet) | Web + mobile + prototype |
 | Sources / Library panel | Web — Local, SC mock, YTM (GPM-style), Spotify/Apple cue |
-| YTM Library / Playlists / Recents | Web — mock OAuth + mock catalog (cue-only) |
+| YTM Library / Playlists / Recents | Web — Connect button; demo library or Google OAuth + YouTube Data API (cue-only) |
 | Local file upload + band-split stems | Web — Web Audio client-side |
 | Demo stem packs (4 buffers) | Web — CDJ mute/solo/faders |
 | Play / cue / sync / pitch + crossfader | Web + mobile + prototype |
@@ -138,6 +146,7 @@ Until those exist, `eas build -p ios` / `eas submit` cannot finish. See [docs/TE
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — systems & DRM model  
 - [HANDOFF.md](docs/HANDOFF.md) — agent phase prompts  
 - [TESTFLIGHT.md](docs/TESTFLIGHT.md) — iOS TestFlight / EAS  
+- [YOUTUBE_MUSIC.md](docs/YOUTUBE_MUSIC.md) — Google Connect / YTM library  
 
 GitHub: [0xKobble/autocue](https://github.com/0xKobble/autocue)
 

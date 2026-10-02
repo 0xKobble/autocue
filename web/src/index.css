@@ -1383,8 +1383,159 @@ button, input {
   color: var(--fog-dim);
 }
 
+
+.connect-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.btn-connect {
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  width: 100%;
+}
+
+.btn-connect:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.btn-connect.yt {
+  background: rgba(255, 0, 0, 0.16);
+  border-color: rgba(255, 80, 80, 0.45);
+  color: #ffb0b0;
+}
+
+.btn-connect.yt:hover:not(:disabled) {
+  background: rgba(255, 0, 0, 0.28);
+}
+
+.btn-connect.sc {
+  background: rgba(255, 85, 0, 0.14);
+  border-color: rgba(255, 120, 60, 0.45);
+  color: #ffb080;
+}
+
+.btn-connect.sc:hover:not(:disabled) {
+  background: rgba(255, 85, 0, 0.26);
+}
+
+.btn-disconnect {
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--fog);
+  width: 100%;
+}
+
+.btn-disconnect:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--white);
+}
+
+.connected-pill {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  background: var(--lime-dim);
+  color: var(--lime);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.connect-error {
+  margin: 0;
+  font-size: 0.65rem;
+  color: #ff8a8a;
+  line-height: 1.35;
+}
+
+.cue-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(255, 0, 0, 0.14);
+  color: #ff8a8a;
+  letter-spacing: 0.01em;
+}
+
+.cue-badge.sc-cue {
+  background: rgba(255, 85, 0, 0.14);
+  color: #ffb080;
+}
+
+.cue-badge.inline {
+  justify-self: end;
+}
+
+.ytm-mode-label {
+  margin: 0.35rem 0 0;
+  font-size: 0.7rem;
+  color: var(--violet);
+  font-weight: 600;
+}
+
+.sc-browser {
+  border: 1px solid rgba(255, 85, 0, 0.22);
+  border-radius: var(--radius-sm);
+  background: #120e0c;
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sc-tab.active {
+  background: rgba(255, 85, 0, 0.22) !important;
+  color: #ffb080 !important;
+}
+
+.sc-pl-card:hover {
+  border-color: rgba(255, 140, 80, 0.5);
+}
+
+.empty-lib {
+  margin: 0.5rem 0;
+  font-size: 0.8rem;
+  color: var(--fog-dim);
+}
+
+.chip-link {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
 .tr-actions {
+  display: flex;
+  gap: 0.3rem;
   padding-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+.btn-mini.deck-a {
+  background: var(--lime-dim);
+  border-color: rgba(184, 255, 60, 0.4);
+  color: var(--lime);
+}
+
+.btn-mini.deck-b {
+  background: var(--violet-dim);
+  border-color: rgba(123, 92, 255, 0.4);
+  color: #c4b5ff;
 }
 
 .btn-mini {
