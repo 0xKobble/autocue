@@ -17,6 +17,19 @@ import {
   decodeAudioFile,
   stemModeLabel,
 } from "../audio/stemEngine";
+import {
+  clearYoutubeCue,
+  getYoutubeCueDurationSec,
+  getYoutubeCuePosition01,
+  loadYoutubeCue,
+  pauseYoutubeCue,
+  playYoutubeCue,
+  seekYoutubeCue,
+  setYoutubeCueErrorHandler,
+  setYoutubeCueStateHandler,
+  setYoutubeCueVolume,
+  youtubeVideoIdOf,
+} from "../audio/youtubeCuePlayer";
 import { generatePeaks, hashStr } from "../audio/waveform";
 import { INITIAL_DECK_A, INITIAL_DECK_B, MOCK_CATALOG } from "../data/mockCatalog";
 import {
@@ -83,6 +96,20 @@ function gainsOf(d: DeckState, crossfade: number) {
     solos: d.solos,
     crossfade,
   };
+}
+
+function deckXfVolume(id: DeckId, crossfade: number): number {
+  if (id === "A") return Math.cos(crossfade * 0.5 * Math.PI);
+  return Math.cos((1 - crossfade) * 0.5 * Math.PI);
+}
+
+function syncYoutubeVolumes(crossfade: number, a: DeckState, b: DeckState) {
+  if (youtubeVideoIdOf(a.track)) {
+    setYoutubeCueVolume("A", a.playing ? deckXfVolume("A", crossfade) : 0);
+  }
+  if (youtubeVideoIdOf(b.track)) {
+    setYoutubeCueVolume("B", b.playing ? deckXfVolume("B", crossfade) : 0);
+  }
 }
 
 export function useDeckEngine() {
@@ -228,13 +255,61 @@ export function useDeckEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // YouTube IFrame ↔ deck playing / error bridge
+  useEffect(() => {
+    setYoutubeCueErrorHandler((id, message) => {
+      setDeck(id, (prev) => ({
+        ...prev,
+        playing: false,
+        analyzeStatus: "error",
+        analyzeMessage: message,
+      }));
+    });
+    setYoutubeCueStateHandler((id, playing) => {
+      const d = id === "A" ? deckARef.current : deckBRef.current;
+      if (!youtubeVideoIdOf(d.track)) return;
+      setDeck(id, (prev) => (prev.playing === playing ? prev : { ...prev, playing }));
+      if (playing) {
+        setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+      }
+    });
+    return () => {
+      setYoutubeCueErrorHandler(null);
+      setYoutubeCueStateHandler(null);
+    };
+  }, [setDeck]);
+
   const togglePlay = useCallback(
     (id: DeckId) => {
       ensureAudio();
       const d = id === "A" ? deckARef.current : deckBRef.current;
       const next = !d.playing;
+      const ytId = youtubeVideoIdOf(d.track);
       setDeck(id, (prev) => ({ ...prev, playing: next }));
       setFocused(id);
+      if (ytId) {
+        // Official YouTube embed — no Web Audio oscillator / stems
+        stopDeck(id);
+        if (next) {
+          void (async () => {
+            try {
+              setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+              await playYoutubeCue(id);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "YouTube play failed";
+              setDeck(id, (prev) => ({
+                ...prev,
+                playing: false,
+                analyzeStatus: "error",
+                analyzeMessage: msg,
+              }));
+            }
+          })();
+        } else {
+          pauseYoutubeCue(id);
+        }
+        return;
+      }
       if (next) {
         startDeck(id, { ...gainsOf(d, crossfadeRef.current), offset01: d.position });
         playClick(id === "A" ? 660 : 520, 0.04, 0.08);
@@ -249,13 +324,35 @@ export function useDeckEngine() {
     (id: DeckId) => {
       ensureAudio();
       const d = id === "A" ? deckARef.current : deckBRef.current;
-      stopDeck(id);
+      const ytId = youtubeVideoIdOf(d.track);
       const cuePos = 0.12;
+      setFocused(id);
+      if (ytId) {
+        stopDeck(id);
+        setDeck(id, (prev) => ({ ...prev, playing: true, position: cuePos }));
+        void (async () => {
+          try {
+            const dur = getYoutubeCueDurationSec(id) ?? Math.max(1, (d.track?.durationMs ?? 180000) / 1000);
+            seekYoutubeCue(id, cuePos * dur);
+            setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+            await playYoutubeCue(id);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "YouTube cue failed";
+            setDeck(id, (prev) => ({
+              ...prev,
+              playing: false,
+              analyzeStatus: "error",
+              analyzeMessage: msg,
+            }));
+          }
+        })();
+        return;
+      }
+      stopDeck(id);
       setDeck(id, (prev) => ({ ...prev, playing: false, position: cuePos }));
       playClick(id === "A" ? 990 : 780, 0.06, 0.12);
       startDeck(id, { ...gainsOf({ ...d, position: cuePos }, crossfadeRef.current), offset01: cuePos });
       setDeck(id, (prev) => ({ ...prev, playing: true, position: cuePos }));
-      setFocused(id);
       window.setTimeout(() => {
         stopDeck(id);
         setDeck(id, (prev) => ({ ...prev, playing: false }));
@@ -336,7 +433,16 @@ export function useDeckEngine() {
     (id: DeckId, track: Track) => {
       stopDeck(id);
       clearDeckAudio(id);
+      const ytId = youtubeVideoIdOf(track);
+      if (ytId) {
+        // Keep IFrame for this deck; clear the other path
+      } else {
+        clearYoutubeCue(id);
+      }
       const seed = hashStr(track.id + track.title);
+      const cueMsg = ytId
+        ? "YouTube cue · Play uses official embed (stems off)"
+        : "Cue-only · streaming";
       setDeck(id, (prev) => ({
         ...prev,
         track,
@@ -351,7 +457,7 @@ export function useDeckEngine() {
         solos: { ...DEFAULT_SOLOS },
         stemMode: track.mixReady ? "none" : "oscillator",
         analyzeStatus: track.mixReady ? "decoding" : "idle",
-        analyzeMessage: track.mixReady ? "Preparing…" : "Cue-only · streaming",
+        analyzeMessage: track.mixReady ? "Preparing…" : cueMsg,
       }));
       if (!track.mixReady) {
         if (id === "A") setPeaksA(generatePeaks(seed));
@@ -360,6 +466,26 @@ export function useDeckEngine() {
       setFocused(id);
       playClick(550, 0.05, 0.1);
       if (track.mixReady) void prepareMixReady(id, track);
+      if (ytId) {
+        void (async () => {
+          try {
+            await loadYoutubeCue(id, ytId, { autoplay: false });
+            setYoutubeCueVolume(id, 0);
+            setDeck(id, (prev) => ({
+              ...prev,
+              analyzeStatus: "idle",
+              analyzeMessage: "YouTube cued · press Play",
+            }));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "YouTube cue load failed";
+            setDeck(id, (prev) => ({
+              ...prev,
+              analyzeStatus: "error",
+              analyzeMessage: msg,
+            }));
+          }
+        })();
+      }
     },
     [setDeck, prepareMixReady]
   );
@@ -369,6 +495,7 @@ export function useDeckEngine() {
       setCrossfade(v);
       syncGains("A", deckARef.current, v);
       syncGains("B", deckBRef.current, v);
+      syncYoutubeVolumes(v, deckARef.current, deckBRef.current);
     },
     [syncGains]
   );
@@ -528,18 +655,28 @@ export function useDeckEngine() {
       const a = deckARef.current;
       const b = deckBRef.current;
       if (a.playing) {
-        const pos = a.track?.mixReady ? getDeckPosition01("A") : (a.position + 0.000035 * ((a.track?.bpm ?? 128) / 128) * (1 + a.pitchPercent / 100));
-        setDeckA((prev) => ({
-          ...prev,
-          position: prev.track?.mixReady ? pos : pos > 0.92 ? 0.08 : pos,
-        }));
+        let pos: number;
+        if (a.track?.mixReady) {
+          pos = getDeckPosition01("A");
+        } else if (youtubeVideoIdOf(a.track)) {
+          pos = getYoutubeCuePosition01("A") ?? a.position;
+        } else {
+          pos = a.position + 0.000035 * ((a.track?.bpm ?? 128) / 128) * (1 + a.pitchPercent / 100);
+          if (pos > 0.92) pos = 0.08;
+        }
+        setDeckA((prev) => ({ ...prev, position: pos }));
       }
       if (b.playing) {
-        const pos = b.track?.mixReady ? getDeckPosition01("B") : (b.position + 0.000035 * ((b.track?.bpm ?? 128) / 128) * (1 + b.pitchPercent / 100));
-        setDeckB((prev) => ({
-          ...prev,
-          position: prev.track?.mixReady ? pos : pos > 0.92 ? 0.08 : pos,
-        }));
+        let pos: number;
+        if (b.track?.mixReady) {
+          pos = getDeckPosition01("B");
+        } else if (youtubeVideoIdOf(b.track)) {
+          pos = getYoutubeCuePosition01("B") ?? b.position;
+        } else {
+          pos = b.position + 0.000035 * ((b.track?.bpm ?? 128) / 128) * (1 + b.pitchPercent / 100);
+          if (pos > 0.92) pos = 0.08;
+        }
+        setDeckB((prev) => ({ ...prev, position: pos }));
       }
       const stemMix = (s: typeof a.stems, m: typeof a.mutes, so: typeof a.solos) => {
         const names = ["vocals", "drums", "bass", "other"] as StemName[];
@@ -566,10 +703,16 @@ export function useDeckEngine() {
 
   useEffect(() => {
     syncGains("A", deckA, crossfade);
+    if (youtubeVideoIdOf(deckA.track)) {
+      setYoutubeCueVolume("A", deckA.playing ? deckXfVolume("A", crossfade) : 0);
+    }
   }, [deckA.playing, deckA.stems, deckA.mutes, deckA.solos, crossfade, syncGains, deckA]);
 
   useEffect(() => {
     syncGains("B", deckB, crossfade);
+    if (youtubeVideoIdOf(deckB.track)) {
+      setYoutubeCueVolume("B", deckB.playing ? deckXfVolume("B", crossfade) : 0);
+    }
   }, [deckB.playing, deckB.stems, deckB.mutes, deckB.solos, crossfade, syncGains, deckB]);
 
   const catalog = useMemo(() => {

@@ -181,7 +181,8 @@ function rowToTrack(row: YtPlaylistItemRow, playlistTitle: string): Track | null
     source: "youtube",
     mixReady: false,
     artworkUrl: art,
-    reason: "YouTube · cue-only",
+    youtubeVideoId: videoId,
+    reason: "YouTube · cue-only · IFrame Play",
     energy: 0.6,
   };
 }

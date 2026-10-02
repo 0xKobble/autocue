@@ -38,6 +38,8 @@ export interface Track {
   previewUrl?: string;
   /** object URL or file path for local / imported audio */
   localUri?: string;
+  /** YouTube / YTM video id for official IFrame cue playback */
+  youtubeVideoId?: string;
   reason?: string;
   /** SoundCloud mock: downloadable / imported mirror */
   downloadable?: boolean;

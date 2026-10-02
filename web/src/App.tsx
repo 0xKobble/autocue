@@ -4,6 +4,7 @@ import { Deck } from "./components/Deck";
 import { SetlistStrip } from "./components/SetlistStrip";
 import { SourcesPanel } from "./components/SourcesPanel";
 import { StemPanel } from "./components/StemPanel";
+import { YoutubeCueLayer } from "./components/YoutubeCueLayer";
 import { useDeckEngine } from "./hooks/useDeckEngine";
 import type { DeckId, Track } from "./types/models";
 
@@ -169,9 +170,11 @@ export default function App() {
         onLoad={onLoadId}
       />
 
+      <YoutubeCueLayer />
+
       <footer className="footer">
         <span>
-          Local / Demo = mix + preview stems · Spotify / Apple / YTM / SC stream = cue-only
+          Local / Demo = mix + stems · YTM = official YouTube embed cue · Spotify / Apple / SC stream = cue-only
         </span>
         <span className="footer-brand">Autocue</span>
       </footer>

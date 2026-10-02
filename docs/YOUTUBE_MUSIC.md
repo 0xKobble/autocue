@@ -4,6 +4,8 @@ Autocue’s **Sources → YouTube Music** panel uses a Google Play Music–inspi
 
 All YouTube / YouTube Music tracks stay **cue-only** (`mixReady: false`). There is no DRM stream decode and no stem split from YTM.
 
+**Play works** via the official **YouTube IFrame Player API**: Load A/B cues the video id; **Play** starts the embed (mini players bottom-right). Crossfader fades embed volume. Stems stay disabled.
+
 **Connect never invents a demo library.** Without `VITE_GOOGLE_CLIENT_ID`, the card shows a **Setup required** CTA. With the client ID, Connect runs real Google OAuth only.
 
 ## 1. Google Cloud Console
@@ -50,7 +52,9 @@ Restart Vite (`Ctrl+C`, then `npm run dev`). `.env.local` is gitignored — neve
 2. Scroll to **Sources / Library** (or click **Sources** in the top bar).
 3. Click **Connect with Google** → grant YouTube readonly.
 4. Your playlist titles + video titles load into the GPM-style browser.
-5. Badge: **YouTube · cue-only**. **Load A** / **Load B** cues a track (no real audio stream).
+5. Badge: **YouTube · cue-only**. **Load A** / **Load B** cues the video into the official embed.
+6. Press **Play** on the deck — you should hear the YouTube audio. Mini players appear bottom-right.
+7. If a video blocks embedding (error 101/150), pick another track or use a Local file for mix/stems.
 
 If sign-in fails, Autocue shows the error and stays **disconnected** (no demo fallback).
 
@@ -69,4 +73,6 @@ If sign-in fails, Autocue shows the error and stays **disconnected** (no demo fa
 | Setup required CTA | `VITE_GOOGLE_CLIENT_ID` missing — set it and restart Vite |
 | `origin_mismatch` / blocked popup | Add `http://localhost:5173` under Authorized JavaScript origins |
 | Empty playlists | Create playlists in YouTube / YouTube Music, then Disconnect → Connect |
+| Play does nothing | Hard-refresh after pull; confirm Load shows “YouTube cued · press Play”; check bottom-right embed; some videos block embed |
+| Embed blocked (101/150) | Uploader disabled embedding — try another video or Local file |
 | API disabled | Enable **YouTube Data API v3** on the same Cloud project as the OAuth client |

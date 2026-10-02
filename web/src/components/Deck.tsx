@@ -1,3 +1,4 @@
+import { youtubeVideoIdOf } from "../audio/youtubeCuePlayer";
 import type { DeckId, DeckState } from "../types/models";
 import { TrackBadge } from "./TrackBadge";
 import { Transport } from "./Transport";
@@ -54,12 +55,22 @@ export function Deck({
       </div>
       {!track?.mixReady && track && (
         <p className="cue-banner">
-          Streaming: cue &amp; browse only. Load Local / Demo for full mix &amp; stems.
+          {youtubeVideoIdOf(track)
+            ? "YouTube cue: Play uses the official embed (bottom-right). Stems stay off — Local/Demo for mix."
+            : "Streaming: cue &amp; browse only. Load Local / Demo for full mix &amp; stems."}
         </p>
       )}
-      {analyzing && (
-        <p className="analyze-banner">{state.analyzeMessage ?? "Analyzing…"}</p>
+      {(analyzing || state.analyzeStatus === "error") && (
+        <p className={`analyze-banner${state.analyzeStatus === "error" ? " error" : ""}`}>
+          {state.analyzeMessage ?? "Analyzing…"}
+        </p>
       )}
+      {!analyzing &&
+        state.analyzeStatus !== "error" &&
+        state.analyzeMessage &&
+        !track?.mixReady && (
+          <p className="analyze-banner cue-status">{state.analyzeMessage}</p>
+        )}
       <Waveform
         deckId={id}
         peaks={peaks}
