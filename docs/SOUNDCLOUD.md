@@ -81,5 +81,7 @@ Restart Vite.
 | `invalid_client` on token exchange | Add `SOUNDCLOUD_CLIENT_SECRET`, or get the app marked public |
 | `redirect_uri` mismatch | Register exactly `http://localhost:5173/` (with slash) |
 | State mismatch | Don’t open the redirect URL twice; click Connect again |
+| `invalid_grant` on Connect | Auth code reused (fixed under React StrictMode), expired, `redirect_uri` ≠ registered `http://localhost:5173/`, or PKCE verifier mismatch. Open **http://localhost:5173** (not 127.0.0.1), restart Vite, click Connect once. Check Network → `/api/soundcloud/token` response body. |
+| `invalid_client` | Set `SOUNDCLOUD_CLIENT_SECRET` in `web/.env.local` and restart Vite |
 | CORS / 401 on API | Confirm token exchange succeeded; check Network tab for `/api/soundcloud/token` |
 | Artist Pro / app limit | SoundCloud currently limits API credentials (often one app per person) |

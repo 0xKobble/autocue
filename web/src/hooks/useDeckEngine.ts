@@ -48,12 +48,12 @@ import {
 } from "../auth/googleYoutube";
 import {
   beginSoundCloudOAuth,
-  clearSoundCloudCallbackFromUrl,
+  clearPendingSoundCloudCallback,
   exchangeSoundCloudCode,
   fetchSoundCloudLibrary,
   hasSoundCloudClientId,
-  readSoundCloudCallback,
   revokeSoundCloudToken,
+  takeSoundCloudCallback,
 } from "../auth/soundcloud";
 import type {
   DeckId,
@@ -570,17 +570,19 @@ export function useDeckEngine() {
     setSources((prev) => ({ ...prev, youtube: false }));
   }, [googleToken]);
 
-  // Finish SoundCloud OAuth after redirect back to localhost
+  // Finish SoundCloud OAuth after redirect back to localhost.
+  // takeSoundCloudCallback stashes ?code= then strips the URL so React StrictMode
+  // remounts still finish the same single-flight token exchange (avoids invalid_grant).
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      let cb: ReturnType<typeof readSoundCloudCallback> = null;
+      let cb: ReturnType<typeof takeSoundCloudCallback> = null;
       try {
-        cb = readSoundCloudCallback();
+        cb = takeSoundCloudCallback();
       } catch (err) {
         const msg = err instanceof Error ? err.message : "SoundCloud OAuth error";
         setScError(msg);
-        clearSoundCloudCallbackFromUrl();
+        clearPendingSoundCloudCallback();
         return;
       }
       if (!cb) return;
@@ -588,6 +590,8 @@ export function useDeckEngine() {
       setScError(null);
       try {
         const tokens = await exchangeSoundCloudCode(cb.code, cb.state);
+        // Shared cache/single-flight: even if this StrictMode pass is cancelled,
+        // leave pending so the remount applies the same tokens.
         if (cancelled) return;
         setScToken(tokens.access_token);
         const { library } = await fetchSoundCloudLibrary(tokens.access_token);
@@ -595,7 +599,9 @@ export function useDeckEngine() {
         setScLibrary(library);
         setScMode("oauth");
         setSources((prev) => ({ ...prev, soundcloud: true }));
+        clearPendingSoundCloudCallback();
       } catch (err) {
+        clearPendingSoundCloudCallback();
         const msg = err instanceof Error ? err.message : "SoundCloud token exchange failed";
         if (!cancelled) {
           setScError(msg);
@@ -604,7 +610,6 @@ export function useDeckEngine() {
           setSources((prev) => ({ ...prev, soundcloud: false }));
         }
       } finally {
-        clearSoundCloudCallbackFromUrl();
         if (!cancelled) setScConnecting(false);
       }
     })();
