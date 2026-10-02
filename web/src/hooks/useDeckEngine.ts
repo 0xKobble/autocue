@@ -2,12 +2,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   applyGains,
   clearDeckAudio,
+  clearXfEqDuck,
   ensureAudio,
+  getDeckDuration,
   getDeckPosition01,
   loadStemBuffers,
   peaksFromBuffers,
   playClick,
   setPitch,
+  setXfEqDuck,
   startDeck,
   stopDeck,
 } from "../audio/audioGraph";
@@ -47,7 +50,10 @@ import {
   animateValue,
   deckXfVolume,
   DEFAULT_TRANSITION_MS,
+  delay as delayMs,
   isStreamCueTrack,
+  planAiBlend,
+  type BlendCurve,
 } from "../audio/streamCueMix";
 import { generatePeaks, hashStr } from "../audio/waveform";
 import { INITIAL_DECK_A, INITIAL_DECK_B, MOCK_CATALOG } from "../data/mockCatalog";
@@ -175,6 +181,7 @@ export function useDeckEngine() {
   /** Live listening: auto-play + blend XF when loading a stream cue onto the other deck. */
   const [autoTransition, setAutoTransition] = useState(true);
   const [transitioning, setTransitioning] = useState(false);
+  const [transitionLabel, setTransitionLabel] = useState<string | null>(null);
 
   const crossfadeRef = useRef(crossfade);
   crossfadeRef.current = crossfade;
@@ -182,8 +189,11 @@ export function useDeckEngine() {
   const deckBRef = useRef(deckB);
   deckARef.current = deckA;
   deckBRef.current = deckB;
+  const aiModeRef = useRef(aiMode);
+  aiModeRef.current = aiMode;
   const fileUrlsRef = useRef<Map<string, string>>(new Map());
   const xfAnimStopRef = useRef<(() => void) | null>(null);
+  const delayStopRef = useRef<(() => void) | null>(null);
   const autoTransitionRef = useRef(autoTransition);
   autoTransitionRef.current = autoTransition;
 
@@ -529,12 +539,41 @@ export function useDeckEngine() {
     [setDeck]
   );
 
+
+  const outgoingPositionSec = useCallback((id: DeckId): number => {
+    const d = id === "A" ? deckARef.current : deckBRef.current;
+    if (!d.track) return 0;
+    if (d.track.mixReady) {
+      const dur = getDeckDuration(id) || Math.max(1, (d.track.durationMs || 180000) / 1000);
+      return getDeckPosition01(id) * dur;
+    }
+    if (youtubeVideoIdOf(d.track)) {
+      const dur =
+        getYoutubeCueDurationSec(id) ?? Math.max(1, (d.track.durationMs || 180000) / 1000);
+      return (getYoutubeCuePosition01(id) ?? d.position) * dur;
+    }
+    if (soundcloudCueUrlOf(d.track)) {
+      const dur =
+        getSoundcloudCueDurationSec(id) ?? Math.max(1, (d.track.durationMs || 180000) / 1000);
+      return (getSoundcloudCuePosition01(id) ?? d.position) * dur;
+    }
+    const dur = Math.max(1, (d.track.durationMs || 180000) / 1000);
+    return d.position * dur;
+  }, []);
+
   const stopXfAnimation = useCallback(() => {
     if (xfAnimStopRef.current) {
       xfAnimStopRef.current();
       xfAnimStopRef.current = null;
     }
+    if (delayStopRef.current) {
+      delayStopRef.current();
+      delayStopRef.current = null;
+    }
+    clearXfEqDuck("A");
+    clearXfEqDuck("B");
     setTransitioning(false);
+    setTransitionLabel(null);
   }, []);
 
   const applyCrossfadeValue = useCallback(
@@ -549,29 +588,69 @@ export function useDeckEngine() {
   );
 
   const animateCrossfadeTo = useCallback(
-    (target: number, durationMs = DEFAULT_TRANSITION_MS) => {
-      stopXfAnimation();
+    (
+      target: number,
+      durationMs = DEFAULT_TRANSITION_MS,
+      opts?: {
+        curve?: BlendCurve;
+        outgoingId?: DeckId;
+        eqDuck?: boolean;
+        label?: string;
+      }
+    ) => {
+      // Cancel prior anim but keep label/transitioning for the new one
+      if (xfAnimStopRef.current) {
+        xfAnimStopRef.current();
+        xfAnimStopRef.current = null;
+      }
+      if (delayStopRef.current) {
+        delayStopRef.current();
+        delayStopRef.current = null;
+      }
+      clearXfEqDuck("A");
+      clearXfEqDuck("B");
+
       const from = crossfadeRef.current;
       const clamped = Math.max(0, Math.min(1, target));
+      const curve = opts?.curve ?? "soft-s";
+      const outgoingId = opts?.outgoingId;
+      const eqDuck = Boolean(opts?.eqDuck && outgoingId);
       setTransitioning(true);
+      if (opts?.label) setTransitionLabel(opts.label);
       let cancelled = false;
-      const { promise, stop } = animateValue(from, clamped, durationMs, (v) => {
-        applyCrossfadeValue(v);
-      });
+      const { promise, stop } = animateValue(
+        from,
+        clamped,
+        durationMs,
+        (v, progress01) => {
+          applyCrossfadeValue(v);
+          if (eqDuck && outgoingId) {
+            // progress toward incoming: how far we've left the outgoing side
+            const leaving =
+              outgoingId === "A"
+                ? Math.min(1, Math.max(0, (v - from) / (clamped - from || 1)))
+                : Math.min(1, Math.max(0, (from - v) / (from - clamped || 1)));
+            setXfEqDuck(outgoingId, leaving || progress01);
+          }
+        },
+        curve
+      );
       xfAnimStopRef.current = () => {
         cancelled = true;
         stop();
       };
       return promise.finally(() => {
         if (xfAnimStopRef.current) {
-          // Clear only if we still own the slot
           xfAnimStopRef.current = null;
         }
+        clearXfEqDuck("A");
+        clearXfEqDuck("B");
         setTransitioning(false);
+        setTransitionLabel(null);
         if (!cancelled) applyCrossfadeValue(clamped);
       });
     },
-    [applyCrossfadeValue, stopXfAnimation]
+    [applyCrossfadeValue]
   );
 
   const playStreamCueIfNeeded = useCallback(
@@ -603,28 +682,70 @@ export function useDeckEngine() {
     [setDeck]
   );
 
-  /** Smooth live blend toward a deck (starts stream cue Play if needed). */
+  /** Smooth live blend toward a deck (starts stream cue Play if needed). AI Mode = phrase-aware. */
   const transitionToDeck = useCallback(
     (id: DeckId) => {
-      const d = id === "A" ? deckARef.current : deckBRef.current;
-      if (!d.track) return;
+      const incoming = id === "A" ? deckARef.current : deckBRef.current;
+      const outgoingId: DeckId = id === "A" ? "B" : "A";
+      const outgoing = outgoingId === "A" ? deckARef.current : deckBRef.current;
+      if (!incoming.track) return;
       setFocused(id);
       void (async () => {
-        if (isStreamCueTrack(d.track) && !d.playing) {
+        const plan = planAiBlend({
+          aiMode: aiModeRef.current,
+          outgoing: outgoing.track,
+          incoming: incoming.track,
+          outgoingPositionSec: outgoing.playing ? outgoingPositionSec(outgoingId) : 0,
+          preferIncomingTop: true,
+        });
+        setTransitionLabel(plan.label);
+        setTransitioning(true);
+
+        // Phrase wait on outgoing (AI Mode)
+        if (plan.delayMs > 0 && outgoing.playing) {
+          const dly = delayMs(plan.delayMs);
+          delayStopRef.current = dly.stop;
+          await dly.promise;
+          delayStopRef.current = null;
+        }
+
+        // Seek incoming to top / cue when AI Mode
+        if (plan.incomingSeekSec >= 0 && !incoming.playing) {
+          const seekSec = plan.incomingSeekSec;
+          if (youtubeVideoIdOf(incoming.track)) {
+            seekYoutubeCue(id, seekSec);
+          } else if (soundcloudCueUrlOf(incoming.track)) {
+            seekSoundcloudCue(id, seekSec);
+          } else if (incoming.track?.mixReady) {
+            // restart near top
+            incoming.position = 0;
+          }
+          setDeck(id, (prev) => ({ ...prev, position: 0 }));
+        }
+
+        if (isStreamCueTrack(incoming.track) && !incoming.playing) {
+          // Park XF on outgoing so incoming starts under the fade
+          applyCrossfadeValue(outgoingId === "A" ? 0 : 1);
           await playStreamCueIfNeeded(id);
-        } else if (d.track?.mixReady && !d.playing) {
-          // Local/Demo: start Web Audio path
+        } else if (incoming.track?.mixReady && !incoming.playing) {
           ensureAudio();
-          setDeck(id, (prev) => ({ ...prev, playing: true }));
+          applyCrossfadeValue(outgoingId === "A" ? 0 : 1);
+          setDeck(id, (prev) => ({ ...prev, playing: true, position: plan.incomingSeekSec >= 0 ? 0 : prev.position }));
           startDeck(id, {
-            ...gainsOf(d, crossfadeRef.current),
-            offset01: d.position,
+            ...gainsOf({ ...incoming, position: plan.incomingSeekSec >= 0 ? 0 : incoming.position }, crossfadeRef.current),
+            offset01: plan.incomingSeekSec >= 0 ? 0 : incoming.position,
           });
         }
-        await animateCrossfadeTo(id === "A" ? 0 : 1, DEFAULT_TRANSITION_MS);
+
+        await animateCrossfadeTo(id === "A" ? 0 : 1, plan.durationMs, {
+          curve: plan.curve,
+          outgoingId,
+          eqDuck: plan.eqDuck,
+          label: plan.label,
+        });
       })();
     },
-    [animateCrossfadeTo, playStreamCueIfNeeded, setDeck]
+    [animateCrossfadeTo, applyCrossfadeValue, outgoingPositionSec, playStreamCueIfNeeded, setDeck]
   );
 
   const onCrossfade = useCallback(
@@ -686,15 +807,40 @@ export function useDeckEngine() {
         const other = otherId === "A" ? deckARef.current : deckBRef.current;
         // Live listening: other deck already playing → start this cue and blend over
         if (!other.playing) return;
+
+        const plan = planAiBlend({
+          aiMode: aiModeRef.current,
+          outgoing: other.track,
+          incoming: track,
+          outgoingPositionSec: outgoingPositionSec(otherId),
+          preferIncomingTop: true,
+        });
+
         setDeck(id, (prev) => ({
           ...prev,
-          analyzeMessage:
-            prev.analyzeMessage?.replace("press Play", "auto-blending…") ??
-            "Auto-blending…",
+          analyzeMessage: plan.label,
         }));
-        // Park XF on the outgoing deck first so the incoming starts under the fade
-        applyCrossfadeValue(otherId === "A" ? 0 : 1);
+        setTransitionLabel(plan.label);
+        setTransitioning(true);
+
         try {
+          // Wait for phrase boundary on outgoing (AI Mode)
+          if (plan.delayMs > 0) {
+            const dly = delayMs(plan.delayMs);
+            delayStopRef.current = dly.stop;
+            await dly.promise;
+            delayStopRef.current = null;
+          }
+
+          // Seek incoming to top when AI Mode
+          if (plan.incomingSeekSec >= 0) {
+            if (ytId) seekYoutubeCue(id, plan.incomingSeekSec);
+            else if (scUrl) seekSoundcloudCue(id, plan.incomingSeekSec);
+            setDeck(id, (prev) => ({ ...prev, position: 0 }));
+          }
+
+          // Park XF on the outgoing deck first so the incoming starts under the fade
+          applyCrossfadeValue(otherId === "A" ? 0 : 1);
           if (ytId) {
             setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
             await playYoutubeCue(id);
@@ -703,7 +849,12 @@ export function useDeckEngine() {
             await playSoundcloudCue(id);
           }
           setDeck(id, (prev) => ({ ...prev, playing: true }));
-          await animateCrossfadeTo(id === "A" ? 0 : 1, DEFAULT_TRANSITION_MS);
+          await animateCrossfadeTo(id === "A" ? 0 : 1, plan.durationMs, {
+            curve: plan.curve,
+            outgoingId: otherId,
+            eqDuck: plan.eqDuck,
+            label: plan.label,
+          });
           setDeck(id, (prev) => ({
             ...prev,
             analyzeStatus: "idle",
@@ -719,6 +870,8 @@ export function useDeckEngine() {
             analyzeStatus: "error",
             analyzeMessage: msg,
           }));
+          setTransitioning(false);
+          setTransitionLabel(null);
         }
       };
 
@@ -764,7 +917,7 @@ export function useDeckEngine() {
         })();
       }
     },
-    [setDeck, prepareMixReady, applyCrossfadeValue, animateCrossfadeTo]
+    [setDeck, prepareMixReady, applyCrossfadeValue, animateCrossfadeTo, outgoingPositionSec]
   );
 
   const toggleSource = useCallback((id: keyof SourceFlags) => {
@@ -1072,6 +1225,51 @@ export function useDeckEngine() {
     deckB.track?.camelot,
   ]);
 
+
+  /**
+   * Skip / Next: load the next setlist track onto the free (or quieter) deck
+   * and AI-blend it in over the currently playing deck.
+   */
+  const skipNext = useCallback(() => {
+    const a = deckARef.current;
+    const b = deckBRef.current;
+    const playingId: DeckId | null = a.playing && !b.playing
+      ? "A"
+      : b.playing && !a.playing
+        ? "B"
+        : a.playing && b.playing
+          ? (crossfadeRef.current < 0.5 ? "A" : "B")
+          : a.playing
+            ? "A"
+            : b.playing
+              ? "B"
+              : null;
+
+    const freeId: DeckId =
+      playingId === "A" ? "B" : playingId === "B" ? "A" : focused === "A" ? "B" : "A";
+
+    const currentTrack = (playingId === "A" ? a : playingId === "B" ? b : (focused === "A" ? a : b)).track;
+    const items = setlist.map((s) => s.track);
+    if (!items.length) return;
+
+    let idx = currentTrack ? items.findIndex((t) => t.id === currentTrack.id) : -1;
+    // Also check free deck track
+    const freeTrack = (freeId === "A" ? a : b).track;
+    if (idx < 0 && freeTrack) idx = items.findIndex((t) => t.id === freeTrack.id);
+    const next = items[(idx + 1) % items.length];
+    if (!next) return;
+
+    // Avoid loading the same track that's already on the playing deck
+    if (playingId && (playingId === "A" ? a : b).track?.id === next.id && items.length > 1) {
+      const alt = items[(idx + 2) % items.length];
+      if (alt) {
+        loadToDeck(freeId, alt);
+        return;
+      }
+    }
+    loadToDeck(freeId, next);
+  }, [setlist, focused, loadToDeck]);
+
   return {
     deckA,
     deckB,
@@ -1084,7 +1282,9 @@ export function useDeckEngine() {
     autoTransition,
     setAutoTransition,
     transitioning,
+    transitionLabel,
     transitionToDeck,
+    skipNext,
     aiMode,
     setAiMode,
     harmonicOn,

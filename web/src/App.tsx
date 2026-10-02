@@ -58,6 +58,11 @@ export default function App() {
         case "T":
           engine.transitionToDeck(engine.focused === "A" ? "B" : "A");
           break;
+        case "n":
+        case "N":
+          e.preventDefault();
+          engine.skipNext();
+          break;
         case "?":
           setHelpOpen(true);
           break;
@@ -123,9 +128,12 @@ export default function App() {
           autoTransition={engine.autoTransition}
           onAutoTransition={engine.setAutoTransition}
           transitioning={engine.transitioning}
+          transitionLabel={engine.transitionLabel}
           onTransitionTo={engine.transitionToDeck}
+          onSkipNext={engine.skipNext}
           canTransitionA={Boolean(engine.deckA.track)}
           canTransitionB={Boolean(engine.deckB.track)}
+          aiMode={engine.aiMode}
         />
         <Deck
           state={engine.deckB}
@@ -186,7 +194,7 @@ export default function App() {
 
       <footer className="footer">
         <span>
-          Local / Demo = mix + stems · YTM / SC = dual-deck cue + live crossfade · Spotify / Apple = cue-only
+          Local / Demo = mix + stems · YTM / SC = dual-deck cue + AI live blend · N = next · Spotify / Apple = cue-only
         </span>
         <span className="footer-brand">Autocue</span>
       </footer>
@@ -215,7 +223,10 @@ export default function App() {
                 <kbd>←</kbd> <kbd>→</kbd> Nudge crossfader
               </li>
               <li>
-                <kbd>T</kbd> Smooth blend to the other deck (~4s)
+                <kbd>T</kbd> Smooth blend to the other deck (AI phrase-aware when AI Mode is on)
+              </li>
+              <li>
+                <kbd>N</kbd> Skip / Next — next setlist track onto free deck + AI blend
               </li>
               <li>
                 <kbd>?</kbd> Toggle this help
@@ -224,8 +235,11 @@ export default function App() {
             <p className="help-note">
               Load YouTube or SoundCloud cues onto <strong>both</strong> decks, press Play on
               each, then sweep the crossfader (or hit <kbd>T</kbd> / ← A / B →) for a live
-              listening blend. Auto-blend on load starts the incoming deck and fades over ~4s.
-              Streams stay cue-only (no stems). Local / Demo = full mix path.
+              listening blend. With <strong>AI Mode</strong> on, blends wait for a phrase
+              boundary (BPM grid), pick length from BPM/energy (8–32 beats), and start the
+              incoming near the top. <kbd>N</kbd> / <strong>Next</strong> loads the next
+              setlist track onto the free deck and blends it in. Streams stay cue-only (no
+              stems). Local / Demo = full mix path + soft EQ duck on the outgoing deck.
             </p>
             <button type="submit" className="btn btn-dialog">
               Close

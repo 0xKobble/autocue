@@ -5,9 +5,12 @@
 import type { DeckId, StemGains, StemMutes, StemSolos, StemName, StemMode } from "../types/models";
 import { STEM_NAMES } from "../types/models";
 import type { StemBuffers } from "./stemEngine";
+import { outgoingEqDuck } from "./streamCueMix";
 
 type DeckNodes = {
   master: GainNode;
+  /** Soft EQ duck during AI/auto XF (Local/Demo only). */
+  xfFilter: BiquadFilterNode;
   stemGains: Record<StemName, GainNode>;
   sources: AudioBufferSourceNode[];
   osc: OscillatorNode | null;
@@ -68,15 +71,21 @@ function ensureDeck(id: DeckId): DeckNodes | null {
     const master = ctx.createGain();
     master.gain.value = 0;
     master.connect(ctx.destination);
+    const xfFilter = ctx.createBiquadFilter();
+    xfFilter.type = "lowpass";
+    xfFilter.frequency.value = 18000;
+    xfFilter.Q.value = 0.7;
+    xfFilter.connect(master);
     const stemGains = {} as Record<StemName, GainNode>;
     for (const n of STEM_NAMES) {
       const g = ctx.createGain();
       g.gain.value = 1;
-      g.connect(master);
+      g.connect(xfFilter);
       stemGains[n] = g;
     }
     d = {
       master,
+      xfFilter,
       stemGains,
       sources: [],
       osc: null,
@@ -375,6 +384,23 @@ export function getDeckMode(id: DeckId): StemMode {
 
 export function getDeckDuration(id: DeckId): number {
   return decks[id]?.durationSec ?? 0;
+}
+
+
+/** Soft high/low duck on outgoing Local deck during XF (progress 0=full, 1=gone). null = reset. */
+export function setXfEqDuck(id: DeckId, progress01: number | null) {
+  const d = decks[id];
+  if (!d || !audioCtx) return;
+  if (progress01 == null) {
+    d.xfFilter.frequency.setTargetAtTime(18000, audioCtx.currentTime, 0.04);
+    return;
+  }
+  const { lowpassHz } = outgoingEqDuck(progress01);
+  d.xfFilter.frequency.setTargetAtTime(lowpassHz, audioCtx.currentTime, 0.03);
+}
+
+export function clearXfEqDuck(id: DeckId) {
+  setXfEqDuck(id, null);
 }
 
 /** Peaks from first stem buffer (or mono mix of vocals). */

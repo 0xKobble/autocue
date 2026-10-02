@@ -6,9 +6,12 @@ interface Props {
   autoTransition: boolean;
   onAutoTransition: (on: boolean) => void;
   transitioning: boolean;
+  transitionLabel: string | null;
   onTransitionTo: (deck: "A" | "B") => void;
+  onSkipNext: () => void;
   canTransitionA: boolean;
   canTransitionB: boolean;
+  aiMode: boolean;
 }
 
 export function Crossfader({
@@ -19,16 +22,21 @@ export function Crossfader({
   autoTransition,
   onAutoTransition,
   transitioning,
+  transitionLabel,
   onTransitionTo,
+  onSkipNext,
   canTransitionA,
   canTransitionB,
+  aiMode,
 }: Props) {
   return (
     <aside className="mixer" aria-label="Mixer">
       <div className="xfader-block">
         <label className="xfader-label" htmlFor="crossfader">
           Crossfader
-          {transitioning ? <span className="xf-live"> · blending</span> : null}
+          {transitioning ? (
+            <span className="xf-live"> · {transitionLabel ?? "blending"}</span>
+          ) : null}
         </label>
         <input
           type="range"
@@ -50,27 +58,43 @@ export function Crossfader({
             className="btn btn-xf"
             disabled={!canTransitionA || transitioning}
             onClick={() => onTransitionTo("A")}
-            title="Smooth fade to Deck A (starts Play if cued)"
+            title="Smooth fade to Deck A (phrase-aware when AI Mode is on)"
           >
             ← A
+          </button>
+          <button
+            type="button"
+            className="btn btn-xf btn-xf-next"
+            disabled={transitioning}
+            onClick={onSkipNext}
+            title="Skip / Next — load next setlist track onto the free deck and AI-blend (N)"
+          >
+            Next
           </button>
           <button
             type="button"
             className="btn btn-xf"
             disabled={!canTransitionB || transitioning}
             onClick={() => onTransitionTo("B")}
-            title="Smooth fade to Deck B (starts Play if cued)"
+            title="Smooth fade to Deck B (phrase-aware when AI Mode is on)"
           >
             B →
           </button>
         </div>
-        <label className="xf-auto" title="When you load a stream cue onto the other deck, auto-play and blend over ~4s">
+        <label
+          className="xf-auto"
+          title={
+            aiMode
+              ? "Load a stream onto the other deck → wait for phrase boundary, then AI blend (BPM/energy length)"
+              : "When you load a stream cue onto the other deck, auto-play and blend (~4s)"
+          }
+        >
           <input
             type="checkbox"
             checked={autoTransition}
             onChange={(e) => onAutoTransition(e.target.checked)}
           />
-          <span>Auto-blend on load</span>
+          <span>{aiMode ? "AI auto-blend" : "Auto-blend on load"}</span>
         </label>
       </div>
       <div className="master-meter" aria-hidden="true">
