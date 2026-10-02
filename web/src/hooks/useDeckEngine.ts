@@ -20,13 +20,11 @@ import {
 import { generatePeaks, hashStr } from "../audio/waveform";
 import { INITIAL_DECK_A, INITIAL_DECK_B, MOCK_CATALOG } from "../data/mockCatalog";
 import {
-  getYtmLibrarySnapshot,
   type YtmLibraryMode,
   type YtmLibrarySnapshot,
 } from "../data/ytmLibrary";
 import {
-  getScLibrarySnapshot,
-  SC_ALL_TRACKS,
+  type ScLibraryMode,
   type ScLibrarySnapshot,
 } from "../data/soundcloudLibrary";
 import {
@@ -35,6 +33,15 @@ import {
   requestGoogleAccessToken,
   revokeGoogleToken,
 } from "../auth/googleYoutube";
+import {
+  beginSoundCloudOAuth,
+  clearSoundCloudCallbackFromUrl,
+  exchangeSoundCloudCode,
+  fetchSoundCloudLibrary,
+  hasSoundCloudClientId,
+  readSoundCloudCallback,
+  revokeSoundCloudToken,
+} from "../auth/soundcloud";
 import type {
   DeckId,
   DeckState,
@@ -102,10 +109,13 @@ export function useDeckEngine() {
   const [scConnecting, setScConnecting] = useState(false);
   const [ytmConnecting, setYtmConnecting] = useState(false);
   const [ytmError, setYtmError] = useState<string | null>(null);
-  const [ytmMode, setYtmMode] = useState<YtmLibraryMode>("demo");
+  const [scError, setScError] = useState<string | null>(null);
+  const [ytmMode, setYtmMode] = useState<YtmLibraryMode>("none");
+  const [scMode, setScMode] = useState<ScLibraryMode>("none");
   const [ytmLibrary, setYtmLibrary] = useState<YtmLibrarySnapshot | null>(null);
   const [scLibrary, setScLibrary] = useState<ScLibrarySnapshot | null>(null);
   const [googleToken, setGoogleToken] = useState<string | null>(null);
+  const [scToken, setScToken] = useState<string | null>(null);
   const [globalAnalyzing, setGlobalAnalyzing] = useState(false);
 
   const crossfadeRef = useRef(crossfade);
@@ -367,45 +377,58 @@ export function useDeckEngine() {
     setSources((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  const connectSoundCloud = useCallback(() => {
+  const connectSoundCloud = useCallback(async () => {
+    setScError(null);
+    if (!hasSoundCloudClientId()) {
+      setScError(
+        "Set VITE_SOUNDCLOUD_CLIENT_ID in web/.env.local (see docs/SOUNDCLOUD.md), then restart Vite."
+      );
+      return;
+    }
     setScConnecting(true);
-    window.setTimeout(() => {
-      setScLibrary(getScLibrarySnapshot());
-      setSources((prev) => ({ ...prev, soundcloud: true }));
+    try {
+      await beginSoundCloudOAuth();
+      // Browser navigates away; connecting stays true until redirect returns
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "SoundCloud connect failed";
+      setScError(msg);
       setScConnecting(false);
-    }, 700);
+    }
   }, []);
 
   const disconnectSoundCloud = useCallback(() => {
+    if (scToken) void revokeSoundCloudToken(scToken);
+    setScToken(null);
     setSources((prev) => ({ ...prev, soundcloud: false }));
     setScLibrary(null);
-  }, []);
+    setScMode("none");
+    setScError(null);
+  }, [scToken]);
 
   const connectYouTube = useCallback(async () => {
     setYtmConnecting(true);
     setYtmError(null);
+    if (!hasGoogleClientId()) {
+      setYtmError(
+        "Set VITE_GOOGLE_CLIENT_ID in web/.env.local (see docs/YOUTUBE_MUSIC.md), then restart Vite."
+      );
+      setYtmConnecting(false);
+      return;
+    }
     try {
-      if (hasGoogleClientId()) {
-        const token = await requestGoogleAccessToken();
-        setGoogleToken(token);
-        const lib = await fetchYoutubeLibrary(token);
-        setYtmLibrary(lib);
-        setYtmMode("google");
-        setSources((prev) => ({ ...prev, youtube: true }));
-      } else {
-        await new Promise((r) => window.setTimeout(r, 650));
-        setYtmLibrary(getYtmLibrarySnapshot());
-        setYtmMode("demo");
-        setGoogleToken(null);
-        setSources((prev) => ({ ...prev, youtube: true }));
-      }
+      const token = await requestGoogleAccessToken();
+      setGoogleToken(token);
+      const lib = await fetchYoutubeLibrary(token);
+      setYtmLibrary(lib);
+      setYtmMode("google");
+      setSources((prev) => ({ ...prev, youtube: true }));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "YouTube connect failed";
       setYtmError(msg);
-      // Fall back to demo library so Connect still feels usable
-      setYtmLibrary(getYtmLibrarySnapshot());
-      setYtmMode("demo");
-      setSources((prev) => ({ ...prev, youtube: true }));
+      setYtmLibrary(null);
+      setYtmMode("none");
+      setGoogleToken(null);
+      setSources((prev) => ({ ...prev, youtube: false }));
     } finally {
       setYtmConnecting(false);
     }
@@ -415,10 +438,53 @@ export function useDeckEngine() {
     if (googleToken) revokeGoogleToken(googleToken);
     setGoogleToken(null);
     setYtmLibrary(null);
-    setYtmMode("demo");
+    setYtmMode("none");
     setYtmError(null);
     setSources((prev) => ({ ...prev, youtube: false }));
   }, [googleToken]);
+
+  // Finish SoundCloud OAuth after redirect back to localhost
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      let cb: ReturnType<typeof readSoundCloudCallback> = null;
+      try {
+        cb = readSoundCloudCallback();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "SoundCloud OAuth error";
+        setScError(msg);
+        clearSoundCloudCallbackFromUrl();
+        return;
+      }
+      if (!cb) return;
+      setScConnecting(true);
+      setScError(null);
+      try {
+        const tokens = await exchangeSoundCloudCode(cb.code, cb.state);
+        if (cancelled) return;
+        setScToken(tokens.access_token);
+        const { library } = await fetchSoundCloudLibrary(tokens.access_token);
+        if (cancelled) return;
+        setScLibrary(library);
+        setScMode("oauth");
+        setSources((prev) => ({ ...prev, soundcloud: true }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "SoundCloud token exchange failed";
+        if (!cancelled) {
+          setScError(msg);
+          setScLibrary(null);
+          setScMode("none");
+          setSources((prev) => ({ ...prev, soundcloud: false }));
+        }
+      } finally {
+        clearSoundCloudCallbackFromUrl();
+        if (!cancelled) setScConnecting(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const importLocalFiles = useCallback(
     async (files: FileList) => {
@@ -525,8 +591,12 @@ export function useDeckEngine() {
         }
       }
     }
-    if (sources.soundcloud) {
-      const scTracks = scLibrary?.stream ?? SC_ALL_TRACKS;
+    if (sources.soundcloud && scLibrary) {
+      const scTracks = [
+        ...scLibrary.stream,
+        ...scLibrary.likes,
+        ...scLibrary.playlists.flatMap((p) => p.tracks),
+      ];
       for (const t of scTracks) {
         if (!ids.has(t.id)) {
           base.push(t);
@@ -615,7 +685,9 @@ export function useDeckEngine() {
     scConnecting,
     ytmConnecting,
     ytmError,
+    scError,
     ytmMode,
+    scMode,
     ytmLibrary,
     scLibrary,
     importLocalFiles,

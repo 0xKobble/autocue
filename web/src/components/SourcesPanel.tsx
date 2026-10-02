@@ -3,8 +3,9 @@ import type { DeckId, SourceKind, Track } from "../types/models";
 import { ACCEPT_AUDIO } from "../types/models";
 import { SourceBadge } from "./TrackBadge";
 import type { YtmLibraryMode, YtmLibrarySnapshot, YtmPlaylist } from "../data/ytmLibrary";
-import type { ScLibrarySnapshot, ScPlaylist } from "../data/soundcloudLibrary";
+import type { ScLibraryMode, ScLibrarySnapshot, ScPlaylist } from "../data/soundcloudLibrary";
 import { hasGoogleClientId } from "../auth/googleYoutube";
+import { hasSoundCloudClientId } from "../auth/soundcloud";
 
 export type SourceFlags = {
   local: boolean;
@@ -28,7 +29,9 @@ interface Props {
   scConnecting: boolean;
   ytmConnecting: boolean;
   ytmError?: string | null;
+  scError?: string | null;
   ytmMode: YtmLibraryMode;
+  scMode: ScLibraryMode;
   ytmLibrary: YtmLibrarySnapshot | null;
   scLibrary: ScLibrarySnapshot | null;
   catalog: Track[];
@@ -52,16 +55,18 @@ const SOURCE_META: {
   {
     id: "soundcloud",
     label: "SoundCloud",
-    capability: "Mock OAuth",
-    note: "Connect opens likes / playlists. Real API needs a SoundCloud client id.",
+    capability: "Cue-only",
+    note: hasSoundCloudClientId()
+      ? "Connect with SoundCloud OAuth (PKCE) to load likes & playlists. Streams stay cue-only."
+      : "Add VITE_SOUNDCLOUD_CLIENT_ID in web/.env.local — see docs/SOUNDCLOUD.md.",
   },
   {
     id: "youtube",
     label: "YouTube Music",
     capability: "Cue-only",
     note: hasGoogleClientId()
-      ? "Connect with Google to load your YouTube playlists (cue-only)."
-      : "Connect opens a GPM-style demo library. Set VITE_GOOGLE_CLIENT_ID for your playlists.",
+      ? "Connect with Google to load your YouTube / YTM playlists (cue-only)."
+      : "Add VITE_GOOGLE_CLIENT_ID in web/.env.local — see docs/YOUTUBE_MUSIC.md.",
   },
   {
     id: "spotify",
@@ -88,7 +93,9 @@ export function SourcesPanel({
   scConnecting,
   ytmConnecting,
   ytmError,
+  scError,
   ytmMode,
+  scMode,
   ytmLibrary,
   scLibrary,
   catalog,
@@ -104,6 +111,7 @@ export function SourcesPanel({
   const [dragOver, setDragOver] = useState(false);
 
   const googleConfigured = hasGoogleClientId();
+  const scConfigured = hasSoundCloudClientId();
 
   const connectedCatalog = useMemo(() => {
     return catalog.filter((t) => {
@@ -129,7 +137,8 @@ export function SourcesPanel({
         <div>
           <h3>Sources / Library</h3>
           <span className="panel-sub">
-            Connect YouTube Music or SoundCloud · Local &amp; Demo mix · streaming cue-only
+            Real Google / SoundCloud OAuth when configured · Local &amp; Demo mix · streaming
+            cue-only
           </span>
         </div>
         {analyzing && <span className="analyze-pill">Analyzing…</span>}
@@ -197,16 +206,30 @@ export function SourcesPanel({
 
               {s.id === "soundcloud" && (
                 <div className="connect-actions">
-                  {!on ? (
+                  {!scConfigured && (
+                    <div className="setup-cta">
+                      <p>
+                        <strong>Setup required.</strong> Create a SoundCloud app, set redirect
+                        URI to <code>http://localhost:5173/</code>, then add{" "}
+                        <code>VITE_SOUNDCLOUD_CLIENT_ID</code> to <code>web/.env.local</code>.
+                      </p>
+                      <p className="setup-hint">
+                        Full steps: <code>docs/SOUNDCLOUD.md</code>. Restart Vite after saving
+                        the env file.
+                      </p>
+                    </div>
+                  )}
+                  {scConfigured && !on && (
                     <button
                       type="button"
                       className="btn btn-connect sc"
                       disabled={scConnecting}
                       onClick={onConnectSoundCloud}
                     >
-                      {scConnecting ? "Connecting…" : "Connect SoundCloud"}
+                      {scConnecting ? "Redirecting to SoundCloud…" : "Connect SoundCloud"}
                     </button>
-                  ) : (
+                  )}
+                  {on && (
                     <button
                       type="button"
                       className="btn btn-disconnect"
@@ -215,34 +238,46 @@ export function SourcesPanel({
                       Disconnect
                     </button>
                   )}
-                  {(scConnecting || on) && (
-                    <p className="mock-oauth">
+                  {scConfigured && (scConnecting || on) && (
+                    <p className="oauth-status">
                       {scConnecting
-                        ? "Mock OAuth… authorizing SoundCloud"
-                        : "Connected (mock) · library below"}
+                        ? "SoundCloud OAuth… exchanging token / loading library"
+                        : scMode === "oauth"
+                          ? `Connected${scLibrary?.displayName ? ` · ${scLibrary.displayName}` : ""} · cue-only`
+                          : "Connected · cue-only"}
                     </p>
                   )}
+                  {scError && <p className="connect-error">{scError}</p>}
                 </div>
               )}
 
               {s.id === "youtube" && (
                 <div className="connect-actions">
-                  {!on ? (
+                  {!googleConfigured && (
+                    <div className="setup-cta">
+                      <p>
+                        <strong>Setup required.</strong> Enable YouTube Data API v3, create a
+                        Web OAuth client, authorize origin{" "}
+                        <code>http://localhost:5173</code>, then add{" "}
+                        <code>VITE_GOOGLE_CLIENT_ID</code> to <code>web/.env.local</code>.
+                      </p>
+                      <p className="setup-hint">
+                        Full steps: <code>docs/YOUTUBE_MUSIC.md</code>. Restart Vite after
+                        saving. Connect will not fake a demo login.
+                      </p>
+                    </div>
+                  )}
+                  {googleConfigured && !on && (
                     <button
                       type="button"
                       className="btn btn-connect yt"
                       disabled={ytmConnecting}
                       onClick={onConnectYouTube}
                     >
-                      {ytmConnecting
-                        ? googleConfigured
-                          ? "Signing in with Google…"
-                          : "Connecting…"
-                        : googleConfigured
-                          ? "Connect with Google"
-                          : "Connect YouTube Music"}
+                      {ytmConnecting ? "Signing in with Google…" : "Connect with Google"}
                     </button>
-                  ) : (
+                  )}
+                  {on && (
                     <button
                       type="button"
                       className="btn btn-disconnect"
@@ -251,15 +286,13 @@ export function SourcesPanel({
                       Disconnect
                     </button>
                   )}
-                  {(ytmConnecting || on) && (
-                    <p className="mock-oauth">
+                  {googleConfigured && (ytmConnecting || on) && (
+                    <p className="oauth-status">
                       {ytmConnecting
-                        ? googleConfigured
-                          ? "Google OAuth… loading playlists"
-                          : "Opening demo GPM-style library…"
+                        ? "Google OAuth… loading YouTube playlists"
                         : ytmMode === "google"
                           ? "Connected · your YouTube playlists · cue-only"
-                          : "Connected · demo library · cue-only"}
+                          : "Connected · cue-only"}
                     </p>
                   )}
                   {ytmError && <p className="connect-error">{ytmError}</p>}
@@ -270,7 +303,7 @@ export function SourcesPanel({
         })}
       </div>
 
-      {sources.youtube && ytmLibrary && (
+      {sources.youtube && ytmLibrary && ytmMode === "google" && (
         <div className="ytm-browser" aria-label="YouTube Music library">
           <header className="ytm-head">
             <div>
@@ -279,11 +312,7 @@ export function SourcesPanel({
                 Library · Playlists · Recents — GPM-inspired ·{" "}
                 <span className="cue-badge">YouTube · cue-only</span>
               </span>
-              <p className="ytm-mode-label">
-                {ytmMode === "google"
-                  ? "Signed in with Google — your playlists"
-                  : "Demo library (set VITE_GOOGLE_CLIENT_ID for your playlists)"}
-              </p>
+              <p className="ytm-mode-label">Signed in with Google — your playlists</p>
             </div>
             <div className="ytm-tabs" role="tablist">
               {(["library", "playlists", "recents"] as YtmTab[]).map((tab) => (
@@ -315,9 +344,7 @@ export function SourcesPanel({
                   key={pl.id}
                   type="button"
                   className="ytm-pl-card"
-                  onClick={() => {
-                    setOpenPlaylist(pl);
-                  }}
+                  onClick={() => setOpenPlaylist(pl)}
                   style={{ "--pl-hue": pl.artHue } as React.CSSProperties}
                 >
                   <div className="ytm-pl-art" />
@@ -371,14 +398,14 @@ export function SourcesPanel({
         </div>
       )}
 
-      {sources.soundcloud && scLibrary && (
+      {sources.soundcloud && scLibrary && scMode === "oauth" && (
         <div className="sc-browser" aria-label="SoundCloud library">
           <header className="ytm-head">
             <div>
-              <h4>SoundCloud</h4>
+              <h4>SoundCloud{scLibrary.displayName ? ` · ${scLibrary.displayName}` : ""}</h4>
               <span className="panel-sub">
-                Likes · Playlists · Stream — mock ·{" "}
-                <span className="cue-badge sc-cue">SC · cue / mix mirrors</span>
+                Likes · Playlists · Stream —{" "}
+                <span className="cue-badge sc-cue">SC · cue-only</span>
               </span>
             </div>
             <div className="ytm-tabs sc-tabs" role="tablist">
@@ -423,6 +450,9 @@ export function SourcesPanel({
                   </div>
                 </button>
               ))}
+              {!scLibrary.playlists.length && (
+                <p className="empty-lib">No playlists yet.</p>
+              )}
             </div>
           )}
 
@@ -517,6 +547,9 @@ function TrackRows({
             {showSource && <SourceBadge source={t.source as SourceKind} />}
             {!showSource && t.source === "youtube" && (
               <span className="cue-badge inline">YouTube · cue-only</span>
+            )}
+            {!showSource && t.source === "soundcloud" && (
+              <span className="cue-badge sc-cue inline">SC · cue-only</span>
             )}
           </button>
           <div className="tr-actions">

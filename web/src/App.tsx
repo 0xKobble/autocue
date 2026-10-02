@@ -147,7 +147,9 @@ export default function App() {
         scConnecting={engine.scConnecting}
         ytmConnecting={engine.ytmConnecting}
         ytmError={engine.ytmError}
+        scError={engine.scError}
         ytmMode={engine.ytmMode}
+        scMode={engine.scMode}
         ytmLibrary={engine.ytmLibrary}
         scLibrary={engine.scLibrary}
         catalog={engine.catalog}
@@ -202,9 +204,9 @@ export default function App() {
               </li>
             </ul>
             <p className="help-note">
-              Click <strong>Sources</strong> → <strong>Connect YouTube Music</strong> for a
-              GPM-style library (demo or Google when configured). Upload Local files or load
-              Demo packs for CDJ-style stem faders. Streaming stays cue-only.
+              Click <strong>Sources</strong> to connect Google (YouTube Music) or SoundCloud
+              with real OAuth when env client IDs are set. Upload Local files or load Demo
+              packs for CDJ-style stem faders. Streaming stays cue-only.
             </p>
             <button type="submit" className="btn btn-dialog">
               Close

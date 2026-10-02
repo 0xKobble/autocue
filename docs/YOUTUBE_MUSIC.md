@@ -1,67 +1,72 @@
 # YouTube Music / Google Connect
 
-Autocue’s **Sources → YouTube Music** panel uses a Google Play Music–inspired **Library / Playlists / Recents** browser.
+Autocue’s **Sources → YouTube Music** panel uses a Google Play Music–inspired **Library / Playlists / Recents** browser backed by **Google Identity Services** + **YouTube Data API v3**.
 
 All YouTube / YouTube Music tracks stay **cue-only** (`mixReady: false`). There is no DRM stream decode and no stem split from YTM.
 
-## Without a Google client ID (default)
+**Connect never invents a demo library.** Without `VITE_GOOGLE_CLIENT_ID`, the card shows a **Setup required** CTA. With the client ID, Connect runs real Google OAuth only.
 
-1. Open http://localhost:5173  
-2. Scroll to **Sources / Library** (or click **Sources** in the top bar)  
-3. Click **Connect YouTube Music**  
-4. A demo library appears immediately — open a playlist, then **Load A** / **Load B**
+## 1. Google Cloud Console
 
-Banner copy: *Demo library (set VITE_GOOGLE_CLIENT_ID for your playlists)*.
+1. Open [Google Cloud Console](https://console.cloud.google.com/) and create (or select) a project.
+2. **APIs & Services → Library** → enable **YouTube Data API v3**.
+3. **APIs & Services → OAuth consent screen**
+   - User type: **External** (fine for testing)
+   - App name / support email as you like
+   - Add test users (your Google account) while the app is in Testing
+   - Scopes to add:
+     - `openid`
+     - `email`
+     - `profile`
+     - `https://www.googleapis.com/auth/youtube.readonly`
+4. **APIs & Services → Credentials → Create credentials → OAuth client ID**
+   - Application type: **Web application**
+   - Name: e.g. `Autocue local`
+   - **Authorized JavaScript origins**
+     - `http://localhost:5173`
+     - (optional) your deployed HTTPS origin
+   - Authorized redirect URIs: not required for GIS token client (popup/token flow)
+5. Copy the **Client ID** (`….apps.googleusercontent.com`).  
+   You do **not** need the client secret for this SPA token flow.
 
-## With Google OAuth (your playlists)
-
-### 1. Google Cloud
-
-1. Create (or open) a project in [Google Cloud Console](https://console.cloud.google.com/)  
-2. Enable **YouTube Data API v3**  
-3. **APIs & Services → Credentials → Create credentials → OAuth client ID**  
-4. Application type: **Web application**  
-5. Authorized JavaScript origins:
-   - `http://localhost:5173`
-   - (optional) your deployed origin  
-6. Copy the **Client ID** (looks like `….apps.googleusercontent.com`)  
-7. Configure the OAuth consent screen (External is fine for testing). Add scopes:
-   - `openid`
-   - `email`
-   - `profile`
-   - `https://www.googleapis.com/auth/youtube.readonly`
-
-### 2. Local env
+## 2. Local env
 
 ```bash
 cd web
 cp .env.example .env.local
-# edit .env.local:
-# VITE_GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-npm run dev
 ```
 
-`.env.local` is gitignored (`*.local` / `.env.*`). Never commit client secrets; the Web client ID is public-ish but still keep it out of the repo.
+Edit `web/.env.local`:
 
-### 3. Connect
+```bash
+VITE_GOOGLE_CLIENT_ID=YOUR_ID.apps.googleusercontent.com
+```
 
-1. Hard-refresh the app  
-2. **Connect with Google** → grant YouTube readonly  
-3. Your playlist titles + video titles load into the GPM-style browser  
-4. Badge: **YouTube · cue-only**  
-5. **Load A** / **Load B** cues the track onto a deck (no real audio stream)
+Restart Vite (`Ctrl+C`, then `npm run dev`). `.env.local` is gitignored — never commit it.
 
-If Google sign-in fails, Autocue falls back to the demo library so Connect still works.
+## 3. Connect in the app
 
-## SoundCloud
+1. Open http://localhost:5173 and hard-refresh (Cmd+Shift+R).
+2. Scroll to **Sources / Library** (or click **Sources** in the top bar).
+3. Click **Connect with Google** → grant YouTube readonly.
+4. Your playlist titles + video titles load into the GPM-style browser.
+5. Badge: **YouTube · cue-only**. **Load A** / **Load B** cues a track (no real audio stream).
 
-**Connect SoundCloud** opens a mock Likes / Playlists / Stream browser the same way. Real SC OAuth needs a SoundCloud client id (not in repo).
+If sign-in fails, Autocue shows the error and stays **disconnected** (no demo fallback).
 
 ## Honesty
 
 | Source | After Connect | Mix / stems |
 |--------|---------------|-------------|
-| YouTube Music (demo or Google) | Library browse + cue to deck | No |
-| SoundCloud mock | Library browse + cue | Only downloadable mock mirrors |
+| YouTube Music (Google) | Real playlists via YouTube Data API · cue to deck | No |
 | Local / Demo | Files / packs | Yes |
 | Spotify / Apple | Toggle catalog rows | No |
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---------|-----|
+| Setup required CTA | `VITE_GOOGLE_CLIENT_ID` missing — set it and restart Vite |
+| `origin_mismatch` / blocked popup | Add `http://localhost:5173` under Authorized JavaScript origins |
+| Empty playlists | Create playlists in YouTube / YouTube Music, then Disconnect → Connect |
+| API disabled | Enable **YouTube Data API v3** on the same Cloud project as the OAuth client |

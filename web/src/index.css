@@ -1187,11 +1187,45 @@ button, input {
   color: var(--fog-dim);
 }
 
-.mock-oauth {
+.mock-oauth,
+.oauth-status {
   margin: 0;
   font-size: 0.65rem;
   color: var(--violet);
   font-weight: 600;
+}
+
+.setup-cta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 196, 80, 0.45);
+  background: rgba(255, 180, 40, 0.08);
+}
+
+.setup-cta p {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--fog);
+}
+
+.setup-cta strong {
+  color: #ffd27a;
+}
+
+.setup-cta code {
+  font-size: 0.68rem;
+  color: #ffe6a8;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.05rem 0.25rem;
+  border-radius: 4px;
+}
+
+.setup-hint {
+  color: var(--fog-dim) !important;
 }
 
 /* YTM GPM-style browser */
