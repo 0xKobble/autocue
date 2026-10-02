@@ -3,14 +3,32 @@ interface Props {
   meterA: number;
   meterB: number;
   onChange: (v: number) => void;
+  autoTransition: boolean;
+  onAutoTransition: (on: boolean) => void;
+  transitioning: boolean;
+  onTransitionTo: (deck: "A" | "B") => void;
+  canTransitionA: boolean;
+  canTransitionB: boolean;
 }
 
-export function Crossfader({ value, meterA, meterB, onChange }: Props) {
+export function Crossfader({
+  value,
+  meterA,
+  meterB,
+  onChange,
+  autoTransition,
+  onAutoTransition,
+  transitioning,
+  onTransitionTo,
+  canTransitionA,
+  canTransitionB,
+}: Props) {
   return (
     <aside className="mixer" aria-label="Mixer">
       <div className="xfader-block">
         <label className="xfader-label" htmlFor="crossfader">
           Crossfader
+          {transitioning ? <span className="xf-live"> · blending</span> : null}
         </label>
         <input
           type="range"
@@ -20,11 +38,40 @@ export function Crossfader({ value, meterA, meterB, onChange }: Props) {
           max={100}
           value={Math.round(value * 100)}
           onChange={(e) => onChange(Number(e.target.value) / 100)}
+          disabled={transitioning}
         />
         <div className="xfader-ends">
           <span className="xf-a">A</span>
           <span className="xf-b">B</span>
         </div>
+        <div className="xf-actions">
+          <button
+            type="button"
+            className="btn btn-xf"
+            disabled={!canTransitionA || transitioning}
+            onClick={() => onTransitionTo("A")}
+            title="Smooth fade to Deck A (starts Play if cued)"
+          >
+            ← A
+          </button>
+          <button
+            type="button"
+            className="btn btn-xf"
+            disabled={!canTransitionB || transitioning}
+            onClick={() => onTransitionTo("B")}
+            title="Smooth fade to Deck B (starts Play if cued)"
+          >
+            B →
+          </button>
+        </div>
+        <label className="xf-auto" title="When you load a stream cue onto the other deck, auto-play and blend over ~4s">
+          <input
+            type="checkbox"
+            checked={autoTransition}
+            onChange={(e) => onAutoTransition(e.target.checked)}
+          />
+          <span>Auto-blend on load</span>
+        </label>
       </div>
       <div className="master-meter" aria-hidden="true">
         <div className="meter-bar" id="meter-a" style={{ height: `${meterA}%` }} />

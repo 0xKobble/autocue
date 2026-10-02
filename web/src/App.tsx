@@ -54,6 +54,10 @@ export default function App() {
         case "ArrowRight":
           engine.onCrossfade(Math.min(1, engine.crossfade + 0.03));
           break;
+        case "t":
+        case "T":
+          engine.transitionToDeck(engine.focused === "A" ? "B" : "A");
+          break;
         case "?":
           setHelpOpen(true);
           break;
@@ -116,6 +120,12 @@ export default function App() {
           meterA={engine.meterA}
           meterB={engine.meterB}
           onChange={engine.onCrossfade}
+          autoTransition={engine.autoTransition}
+          onAutoTransition={engine.setAutoTransition}
+          transitioning={engine.transitioning}
+          onTransitionTo={engine.transitionToDeck}
+          canTransitionA={Boolean(engine.deckA.track)}
+          canTransitionB={Boolean(engine.deckB.track)}
         />
         <Deck
           state={engine.deckB}
@@ -176,7 +186,7 @@ export default function App() {
 
       <footer className="footer">
         <span>
-          Local / Demo = mix + stems · YTM / SoundCloud = official embed cue · Spotify / Apple = cue-only
+          Local / Demo = mix + stems · YTM / SC = dual-deck cue + live crossfade · Spotify / Apple = cue-only
         </span>
         <span className="footer-brand">Autocue</span>
       </footer>
@@ -205,13 +215,17 @@ export default function App() {
                 <kbd>←</kbd> <kbd>→</kbd> Nudge crossfader
               </li>
               <li>
+                <kbd>T</kbd> Smooth blend to the other deck (~4s)
+              </li>
+              <li>
                 <kbd>?</kbd> Toggle this help
               </li>
             </ul>
             <p className="help-note">
-              Click <strong>Sources</strong> to connect Google (YouTube Music) or SoundCloud
-              with real OAuth when env client IDs are set. Upload Local files or load Demo
-              packs for CDJ-style stem faders. Streaming stays cue-only.
+              Load YouTube or SoundCloud cues onto <strong>both</strong> decks, press Play on
+              each, then sweep the crossfader (or hit <kbd>T</kbd> / ← A / B →) for a live
+              listening blend. Auto-blend on load starts the incoming deck and fades over ~4s.
+              Streams stay cue-only (no stems). Local / Demo = full mix path.
             </p>
             <button type="submit" className="btn btn-dialog">
               Close

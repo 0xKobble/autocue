@@ -43,6 +43,12 @@ import {
   setSoundcloudCueVolume,
   soundcloudCueUrlOf,
 } from "../audio/soundcloudCuePlayer";
+import {
+  animateValue,
+  deckXfVolume,
+  DEFAULT_TRANSITION_MS,
+  isStreamCueTrack,
+} from "../audio/streamCueMix";
 import { generatePeaks, hashStr } from "../audio/waveform";
 import { INITIAL_DECK_A, INITIAL_DECK_B, MOCK_CATALOG } from "../data/mockCatalog";
 import {
@@ -111,11 +117,6 @@ function gainsOf(d: DeckState, crossfade: number) {
   };
 }
 
-function deckXfVolume(id: DeckId, crossfade: number): number {
-  if (id === "A") return Math.cos(crossfade * 0.5 * Math.PI);
-  return Math.cos((1 - crossfade) * 0.5 * Math.PI);
-}
-
 function syncYoutubeVolumes(crossfade: number, a: DeckState, b: DeckState) {
   if (youtubeVideoIdOf(a.track)) {
     setYoutubeCueVolume("A", a.playing ? deckXfVolume("A", crossfade) : 0);
@@ -171,6 +172,9 @@ export function useDeckEngine() {
   const [googleToken, setGoogleToken] = useState<string | null>(null);
   const [scToken, setScToken] = useState<string | null>(null);
   const [globalAnalyzing, setGlobalAnalyzing] = useState(false);
+  /** Live listening: auto-play + blend XF when loading a stream cue onto the other deck. */
+  const [autoTransition, setAutoTransition] = useState(true);
+  const [transitioning, setTransitioning] = useState(false);
 
   const crossfadeRef = useRef(crossfade);
   crossfadeRef.current = crossfade;
@@ -179,6 +183,9 @@ export function useDeckEngine() {
   deckARef.current = deckA;
   deckBRef.current = deckB;
   const fileUrlsRef = useRef<Map<string, string>>(new Map());
+  const xfAnimStopRef = useRef<(() => void) | null>(null);
+  const autoTransitionRef = useRef(autoTransition);
+  autoTransitionRef.current = autoTransition;
 
   const setDeck = useCallback((id: DeckId, updater: (d: DeckState) => DeckState) => {
     if (id === "A") setDeckA(updater);
@@ -522,6 +529,114 @@ export function useDeckEngine() {
     [setDeck]
   );
 
+  const stopXfAnimation = useCallback(() => {
+    if (xfAnimStopRef.current) {
+      xfAnimStopRef.current();
+      xfAnimStopRef.current = null;
+    }
+    setTransitioning(false);
+  }, []);
+
+  const applyCrossfadeValue = useCallback(
+    (v: number) => {
+      crossfadeRef.current = v;
+      setCrossfade(v);
+      syncGains("A", deckARef.current, v);
+      syncGains("B", deckBRef.current, v);
+      syncStreamCueVolumes(v, deckARef.current, deckBRef.current);
+    },
+    [syncGains]
+  );
+
+  const animateCrossfadeTo = useCallback(
+    (target: number, durationMs = DEFAULT_TRANSITION_MS) => {
+      stopXfAnimation();
+      const from = crossfadeRef.current;
+      const clamped = Math.max(0, Math.min(1, target));
+      setTransitioning(true);
+      let cancelled = false;
+      const { promise, stop } = animateValue(from, clamped, durationMs, (v) => {
+        applyCrossfadeValue(v);
+      });
+      xfAnimStopRef.current = () => {
+        cancelled = true;
+        stop();
+      };
+      return promise.finally(() => {
+        if (xfAnimStopRef.current) {
+          // Clear only if we still own the slot
+          xfAnimStopRef.current = null;
+        }
+        setTransitioning(false);
+        if (!cancelled) applyCrossfadeValue(clamped);
+      });
+    },
+    [applyCrossfadeValue, stopXfAnimation]
+  );
+
+  const playStreamCueIfNeeded = useCallback(
+    async (id: DeckId) => {
+      const d = id === "A" ? deckARef.current : deckBRef.current;
+      if (!isStreamCueTrack(d.track) || d.playing) return;
+      const ytId = youtubeVideoIdOf(d.track);
+      const scUrl = soundcloudCueUrlOf(d.track);
+      setDeck(id, (prev) => ({ ...prev, playing: true }));
+      stopDeck(id);
+      try {
+        if (ytId) {
+          setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+          await playYoutubeCue(id);
+        } else if (scUrl) {
+          setSoundcloudCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+          await playSoundcloudCue(id);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Stream play failed";
+        setDeck(id, (prev) => ({
+          ...prev,
+          playing: false,
+          analyzeStatus: "error",
+          analyzeMessage: msg,
+        }));
+      }
+    },
+    [setDeck]
+  );
+
+  /** Smooth live blend toward a deck (starts stream cue Play if needed). */
+  const transitionToDeck = useCallback(
+    (id: DeckId) => {
+      const d = id === "A" ? deckARef.current : deckBRef.current;
+      if (!d.track) return;
+      setFocused(id);
+      void (async () => {
+        if (isStreamCueTrack(d.track) && !d.playing) {
+          await playStreamCueIfNeeded(id);
+        } else if (d.track?.mixReady && !d.playing) {
+          // Local/Demo: start Web Audio path
+          ensureAudio();
+          setDeck(id, (prev) => ({ ...prev, playing: true }));
+          startDeck(id, {
+            ...gainsOf(d, crossfadeRef.current),
+            offset01: d.position,
+          });
+        }
+        await animateCrossfadeTo(id === "A" ? 0 : 1, DEFAULT_TRANSITION_MS);
+      })();
+    },
+    [animateCrossfadeTo, playStreamCueIfNeeded, setDeck]
+  );
+
+  const onCrossfade = useCallback(
+    (v: number) => {
+      // Manual drag cancels an in-flight auto-blend
+      stopXfAnimation();
+      applyCrossfadeValue(v);
+    },
+    [applyCrossfadeValue, stopXfAnimation]
+  );
+
+
   const loadToDeck = useCallback(
     (id: DeckId, track: Track) => {
       stopDeck(id);
@@ -565,6 +680,48 @@ export function useDeckEngine() {
       setFocused(id);
       playClick(550, 0.05, 0.1);
       if (track.mixReady) void prepareMixReady(id, track);
+      const maybeAutoBlend = async () => {
+        if (!autoTransitionRef.current) return;
+        const otherId: DeckId = id === "A" ? "B" : "A";
+        const other = otherId === "A" ? deckARef.current : deckBRef.current;
+        // Live listening: other deck already playing → start this cue and blend over
+        if (!other.playing) return;
+        setDeck(id, (prev) => ({
+          ...prev,
+          analyzeMessage:
+            prev.analyzeMessage?.replace("press Play", "auto-blending…") ??
+            "Auto-blending…",
+        }));
+        // Park XF on the outgoing deck first so the incoming starts under the fade
+        applyCrossfadeValue(otherId === "A" ? 0 : 1);
+        try {
+          if (ytId) {
+            setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+            await playYoutubeCue(id);
+          } else if (scUrl) {
+            setSoundcloudCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+            await playSoundcloudCue(id);
+          }
+          setDeck(id, (prev) => ({ ...prev, playing: true }));
+          await animateCrossfadeTo(id === "A" ? 0 : 1, DEFAULT_TRANSITION_MS);
+          setDeck(id, (prev) => ({
+            ...prev,
+            analyzeStatus: "idle",
+            analyzeMessage: ytId
+              ? "YouTube live · crossfader blends decks"
+              : "SoundCloud live · crossfader blends decks",
+          }));
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Auto-blend failed";
+          setDeck(id, (prev) => ({
+            ...prev,
+            playing: false,
+            analyzeStatus: "error",
+            analyzeMessage: msg,
+          }));
+        }
+      };
+
       if (ytId) {
         void (async () => {
           try {
@@ -575,6 +732,7 @@ export function useDeckEngine() {
               analyzeStatus: "idle",
               analyzeMessage: "YouTube cued · press Play",
             }));
+            await maybeAutoBlend();
           } catch (err) {
             const msg = err instanceof Error ? err.message : "YouTube cue load failed";
             setDeck(id, (prev) => ({
@@ -594,6 +752,7 @@ export function useDeckEngine() {
               analyzeStatus: "idle",
               analyzeMessage: "SoundCloud cued · press Play",
             }));
+            await maybeAutoBlend();
           } catch (err) {
             const msg = err instanceof Error ? err.message : "SoundCloud cue load failed";
             setDeck(id, (prev) => ({
@@ -605,17 +764,7 @@ export function useDeckEngine() {
         })();
       }
     },
-    [setDeck, prepareMixReady]
-  );
-
-  const onCrossfade = useCallback(
-    (v: number) => {
-      setCrossfade(v);
-      syncGains("A", deckARef.current, v);
-      syncGains("B", deckBRef.current, v);
-      syncStreamCueVolumes(v, deckARef.current, deckBRef.current);
-    },
-    [syncGains]
+    [setDeck, prepareMixReady, applyCrossfadeValue, animateCrossfadeTo]
   );
 
   const toggleSource = useCallback((id: keyof SourceFlags) => {
@@ -932,6 +1081,10 @@ export function useDeckEngine() {
     setStemTarget,
     crossfade,
     onCrossfade,
+    autoTransition,
+    setAutoTransition,
+    transitioning,
+    transitionToDeck,
     aiMode,
     setAiMode,
     harmonicOn,

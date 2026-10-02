@@ -508,6 +508,64 @@ button, input {
 .xf-a { color: var(--lime); }
 .xf-b { color: var(--violet); }
 
+.xf-live {
+  color: var(--lime);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.xf-actions {
+  display: flex;
+  gap: 0.35rem;
+  width: 100%;
+  max-width: 120px;
+  justify-content: center;
+}
+
+.btn-xf {
+  flex: 1;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.35rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fog);
+  cursor: pointer;
+}
+
+.btn-xf:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--white);
+}
+
+.btn-xf:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.xf-auto {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6rem;
+  color: var(--fog-dim);
+  cursor: pointer;
+  user-select: none;
+  max-width: 120px;
+  line-height: 1.25;
+}
+
+.xf-auto input {
+  accent-color: var(--lime);
+}
+
+.crossfader:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 .master-meter {
   display: flex;
   gap: 6px;

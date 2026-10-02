@@ -1,3 +1,4 @@
+import { soundcloudCueUrlOf } from "../audio/soundcloudCuePlayer";
 import { youtubeVideoIdOf } from "../audio/youtubeCuePlayer";
 import type { DeckId, DeckState } from "../types/models";
 import { TrackBadge } from "./TrackBadge";
@@ -13,6 +14,16 @@ interface Props {
   onCue: () => void;
   onSync: () => void;
   onPitch: (v: number) => void;
+}
+
+function cueBanner(track: NonNullable<DeckState["track"]>): string {
+  if (youtubeVideoIdOf(track)) {
+    return "YouTube cue: Play uses the official embed. Crossfader blends with the other deck — stems off.";
+  }
+  if (soundcloudCueUrlOf(track)) {
+    return "SoundCloud cue: Play uses the official Widget. Crossfader blends with the other deck — stems off.";
+  }
+  return "Streaming: cue & browse only. Load Local / Demo for full mix & stems.";
 }
 
 export function Deck({
@@ -53,13 +64,7 @@ export function Deck({
           <span>{track?.key ?? "—"}</span>
         </p>
       </div>
-      {!track?.mixReady && track && (
-        <p className="cue-banner">
-          {youtubeVideoIdOf(track)
-            ? "YouTube cue: Play uses the official embed (bottom-right). Stems stay off — Local/Demo for mix."
-            : "Streaming: cue &amp; browse only. Load Local / Demo for full mix &amp; stems."}
-        </p>
-      )}
+      {!track?.mixReady && track && <p className="cue-banner">{cueBanner(track)}</p>}
       {(analyzing || state.analyzeStatus === "error") && (
         <p className={`analyze-banner${state.analyzeStatus === "error" ? " error" : ""}`}>
           {state.analyzeMessage ?? "Analyzing…"}
