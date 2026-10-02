@@ -325,8 +325,10 @@ function scTrackToTrack(t: ScTrack): Track | null {
     // Streams stay cue-only; downloadable flag does not unlock DRM-free decode here
     mixReady: false,
     downloadable,
+    soundcloudTrackId: String(t.id),
+    soundcloudPermalinkUrl: t.permalink_url?.trim() || undefined,
     artworkUrl: t.artwork_url?.replace("-large", "-t500x500") || t.artwork_url,
-    reason: "SoundCloud · cue-only",
+    reason: "SoundCloud · cue-only (Widget)",
     energy: 0.65,
     album: t.genre || undefined,
   };

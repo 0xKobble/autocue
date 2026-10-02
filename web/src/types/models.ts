@@ -40,8 +40,12 @@ export interface Track {
   localUri?: string;
   /** YouTube / YTM video id for official IFrame cue playback */
   youtubeVideoId?: string;
+  /** SoundCloud numeric track id for Widget API */
+  soundcloudTrackId?: string;
+  /** SoundCloud permalink_url for Widget API (preferred over api URL) */
+  soundcloudPermalinkUrl?: string;
   reason?: string;
-  /** SoundCloud mock: downloadable / imported mirror */
+  /** SoundCloud: downloadable / imported mirror */
   downloadable?: boolean;
 }
 

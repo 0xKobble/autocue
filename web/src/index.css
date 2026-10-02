@@ -1679,3 +1679,66 @@ button, input {
     transform-origin: bottom right;
   }
 }
+
+
+/* ——— SoundCloud cue Widget hosts ——— */
+.sc-cue-layer {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: auto;
+}
+
+.sc-cue-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.35rem;
+  border-radius: 10px;
+  background: rgba(10, 10, 11, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+
+.sc-cue-slot[data-active="true"] {
+  opacity: 1;
+  border-color: rgba(255, 85, 0, 0.55);
+}
+
+.sc-cue-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fog);
+  padding: 0 0.15rem;
+}
+
+.sc-cue-host {
+  width: 220px;
+  height: 120px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #111;
+}
+
+.sc-cue-host iframe {
+  display: block;
+  width: 220px !important;
+  height: 120px !important;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .sc-cue-layer {
+    left: 8px;
+    bottom: 8px;
+    transform: scale(0.85);
+    transform-origin: bottom left;
+  }
+}

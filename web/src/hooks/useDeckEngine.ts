@@ -30,6 +30,19 @@ import {
   setYoutubeCueVolume,
   youtubeVideoIdOf,
 } from "../audio/youtubeCuePlayer";
+import {
+  clearSoundcloudCue,
+  getSoundcloudCueDurationSec,
+  getSoundcloudCuePosition01,
+  loadSoundcloudCue,
+  pauseSoundcloudCue,
+  playSoundcloudCue,
+  seekSoundcloudCue,
+  setSoundcloudCueErrorHandler,
+  setSoundcloudCueStateHandler,
+  setSoundcloudCueVolume,
+  soundcloudCueUrlOf,
+} from "../audio/soundcloudCuePlayer";
 import { generatePeaks, hashStr } from "../audio/waveform";
 import { INITIAL_DECK_A, INITIAL_DECK_B, MOCK_CATALOG } from "../data/mockCatalog";
 import {
@@ -110,6 +123,20 @@ function syncYoutubeVolumes(crossfade: number, a: DeckState, b: DeckState) {
   if (youtubeVideoIdOf(b.track)) {
     setYoutubeCueVolume("B", b.playing ? deckXfVolume("B", crossfade) : 0);
   }
+}
+
+function syncSoundcloudVolumes(crossfade: number, a: DeckState, b: DeckState) {
+  if (soundcloudCueUrlOf(a.track)) {
+    setSoundcloudCueVolume("A", a.playing ? deckXfVolume("A", crossfade) : 0);
+  }
+  if (soundcloudCueUrlOf(b.track)) {
+    setSoundcloudCueVolume("B", b.playing ? deckXfVolume("B", crossfade) : 0);
+  }
+}
+
+function syncStreamCueVolumes(crossfade: number, a: DeckState, b: DeckState) {
+  syncYoutubeVolumes(crossfade, a, b);
+  syncSoundcloudVolumes(crossfade, a, b);
 }
 
 export function useDeckEngine() {
@@ -255,7 +282,7 @@ export function useDeckEngine() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // YouTube IFrame ↔ deck playing / error bridge
+  // YouTube / SoundCloud embed ↔ deck playing / error bridge
   useEffect(() => {
     setYoutubeCueErrorHandler((id, message) => {
       setDeck(id, (prev) => ({
@@ -273,9 +300,27 @@ export function useDeckEngine() {
         setYoutubeCueVolume(id, deckXfVolume(id, crossfadeRef.current));
       }
     });
+    setSoundcloudCueErrorHandler((id, message) => {
+      setDeck(id, (prev) => ({
+        ...prev,
+        playing: false,
+        analyzeStatus: "error",
+        analyzeMessage: message,
+      }));
+    });
+    setSoundcloudCueStateHandler((id, playing) => {
+      const d = id === "A" ? deckARef.current : deckBRef.current;
+      if (!soundcloudCueUrlOf(d.track)) return;
+      setDeck(id, (prev) => (prev.playing === playing ? prev : { ...prev, playing }));
+      if (playing) {
+        setSoundcloudCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+      }
+    });
     return () => {
       setYoutubeCueErrorHandler(null);
       setYoutubeCueStateHandler(null);
+      setSoundcloudCueErrorHandler(null);
+      setSoundcloudCueStateHandler(null);
     };
   }, [setDeck]);
 
@@ -285,6 +330,7 @@ export function useDeckEngine() {
       const d = id === "A" ? deckARef.current : deckBRef.current;
       const next = !d.playing;
       const ytId = youtubeVideoIdOf(d.track);
+      const scUrl = soundcloudCueUrlOf(d.track);
       setDeck(id, (prev) => ({ ...prev, playing: next }));
       setFocused(id);
       if (ytId) {
@@ -310,6 +356,29 @@ export function useDeckEngine() {
         }
         return;
       }
+      if (scUrl) {
+        // Official SoundCloud Widget — cue-only, mixReady false
+        stopDeck(id);
+        if (next) {
+          void (async () => {
+            try {
+              setSoundcloudCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+              await playSoundcloudCue(id);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "SoundCloud play failed";
+              setDeck(id, (prev) => ({
+                ...prev,
+                playing: false,
+                analyzeStatus: "error",
+                analyzeMessage: msg,
+              }));
+            }
+          })();
+        } else {
+          pauseSoundcloudCue(id);
+        }
+        return;
+      }
       if (next) {
         startDeck(id, { ...gainsOf(d, crossfadeRef.current), offset01: d.position });
         playClick(id === "A" ? 660 : 520, 0.04, 0.08);
@@ -325,6 +394,7 @@ export function useDeckEngine() {
       ensureAudio();
       const d = id === "A" ? deckARef.current : deckBRef.current;
       const ytId = youtubeVideoIdOf(d.track);
+      const scUrl = soundcloudCueUrlOf(d.track);
       const cuePos = 0.12;
       setFocused(id);
       if (ytId) {
@@ -338,6 +408,29 @@ export function useDeckEngine() {
             await playYoutubeCue(id);
           } catch (err) {
             const msg = err instanceof Error ? err.message : "YouTube cue failed";
+            setDeck(id, (prev) => ({
+              ...prev,
+              playing: false,
+              analyzeStatus: "error",
+              analyzeMessage: msg,
+            }));
+          }
+        })();
+        return;
+      }
+      if (scUrl) {
+        stopDeck(id);
+        setDeck(id, (prev) => ({ ...prev, playing: true, position: cuePos }));
+        void (async () => {
+          try {
+            const dur =
+              getSoundcloudCueDurationSec(id) ??
+              Math.max(1, (d.track?.durationMs ?? 180000) / 1000);
+            seekSoundcloudCue(id, cuePos * dur);
+            setSoundcloudCueVolume(id, deckXfVolume(id, crossfadeRef.current));
+            await playSoundcloudCue(id);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "SoundCloud cue failed";
             setDeck(id, (prev) => ({
               ...prev,
               playing: false,
@@ -434,15 +527,21 @@ export function useDeckEngine() {
       stopDeck(id);
       clearDeckAudio(id);
       const ytId = youtubeVideoIdOf(track);
+      const scUrl = soundcloudCueUrlOf(track);
       if (ytId) {
-        // Keep IFrame for this deck; clear the other path
+        clearSoundcloudCue(id);
+      } else if (scUrl) {
+        clearYoutubeCue(id);
       } else {
         clearYoutubeCue(id);
+        clearSoundcloudCue(id);
       }
       const seed = hashStr(track.id + track.title);
       const cueMsg = ytId
         ? "YouTube cue · Play uses official embed (stems off)"
-        : "Cue-only · streaming";
+        : scUrl
+          ? "SoundCloud cue · Play uses official Widget (stems off)"
+          : "Cue-only · streaming";
       setDeck(id, (prev) => ({
         ...prev,
         track,
@@ -485,6 +584,25 @@ export function useDeckEngine() {
             }));
           }
         })();
+      } else if (scUrl) {
+        void (async () => {
+          try {
+            await loadSoundcloudCue(id, scUrl, { autoplay: false });
+            setSoundcloudCueVolume(id, 0);
+            setDeck(id, (prev) => ({
+              ...prev,
+              analyzeStatus: "idle",
+              analyzeMessage: "SoundCloud cued · press Play",
+            }));
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "SoundCloud cue load failed";
+            setDeck(id, (prev) => ({
+              ...prev,
+              analyzeStatus: "error",
+              analyzeMessage: msg,
+            }));
+          }
+        })();
       }
     },
     [setDeck, prepareMixReady]
@@ -495,7 +613,7 @@ export function useDeckEngine() {
       setCrossfade(v);
       syncGains("A", deckARef.current, v);
       syncGains("B", deckBRef.current, v);
-      syncYoutubeVolumes(v, deckARef.current, deckBRef.current);
+      syncStreamCueVolumes(v, deckARef.current, deckBRef.current);
     },
     [syncGains]
   );
@@ -665,6 +783,8 @@ export function useDeckEngine() {
           pos = getDeckPosition01("A");
         } else if (youtubeVideoIdOf(a.track)) {
           pos = getYoutubeCuePosition01("A") ?? a.position;
+        } else if (soundcloudCueUrlOf(a.track)) {
+          pos = getSoundcloudCuePosition01("A") ?? a.position;
         } else {
           pos = a.position + 0.000035 * ((a.track?.bpm ?? 128) / 128) * (1 + a.pitchPercent / 100);
           if (pos > 0.92) pos = 0.08;
@@ -677,6 +797,8 @@ export function useDeckEngine() {
           pos = getDeckPosition01("B");
         } else if (youtubeVideoIdOf(b.track)) {
           pos = getYoutubeCuePosition01("B") ?? b.position;
+        } else if (soundcloudCueUrlOf(b.track)) {
+          pos = getSoundcloudCuePosition01("B") ?? b.position;
         } else {
           pos = b.position + 0.000035 * ((b.track?.bpm ?? 128) / 128) * (1 + b.pitchPercent / 100);
           if (pos > 0.92) pos = 0.08;
@@ -711,12 +833,18 @@ export function useDeckEngine() {
     if (youtubeVideoIdOf(deckA.track)) {
       setYoutubeCueVolume("A", deckA.playing ? deckXfVolume("A", crossfade) : 0);
     }
+    if (soundcloudCueUrlOf(deckA.track)) {
+      setSoundcloudCueVolume("A", deckA.playing ? deckXfVolume("A", crossfade) : 0);
+    }
   }, [deckA.playing, deckA.stems, deckA.mutes, deckA.solos, crossfade, syncGains, deckA]);
 
   useEffect(() => {
     syncGains("B", deckB, crossfade);
     if (youtubeVideoIdOf(deckB.track)) {
       setYoutubeCueVolume("B", deckB.playing ? deckXfVolume("B", crossfade) : 0);
+    }
+    if (soundcloudCueUrlOf(deckB.track)) {
+      setSoundcloudCueVolume("B", deckB.playing ? deckXfVolume("B", crossfade) : 0);
     }
   }, [deckB.playing, deckB.stems, deckB.mutes, deckB.solos, crossfade, syncGains, deckB]);
 
